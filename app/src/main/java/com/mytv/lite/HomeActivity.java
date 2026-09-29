@@ -29,7 +29,6 @@ public class HomeActivity extends Activity {
     private FrameLayout contentHost;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private int focusIndex = 0;
     private static final int CARD_COUNT = 6;
     private final Runnable clockTick = new Runnable() {
         @Override public void run() {
@@ -126,7 +125,8 @@ public class HomeActivity extends Activity {
         contentHost = new FrameLayout(this);
         root.addView(contentHost, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
-        applyFocus();
+        // 初始焦点给第一张卡片
+        cardRow.post(() -> { if (!cardRow.hasFocus() && cardRow.getChildCount() > 0) cardRow.getChildAt(0).requestFocus(); });
         handler.post(clockTick);
         startServer();
     }
@@ -136,6 +136,7 @@ public class HomeActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setGravity(Gravity.CENTER);
         card.setBackgroundColor(bgColor);
+        card.setTag(R.id.card_bg, bgColor);   // 保存原始背景色
         int m = dp(10);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(220), 1f);
         lp.setMargins(m, 0, m, 0);
@@ -165,28 +166,19 @@ public class HomeActivity extends Activity {
 
         card.setFocusable(true);
         card.setOnClickListener(v -> l.launch());
+        // 焦点即高亮：系统焦点移动驱动视觉，OK 键由系统派发给聚焦卡片
+        card.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                ((LinearLayout) v).setBackgroundColor(0xFF4FC3F7);
+                v.setScaleX(1.08f); v.setScaleY(1.08f); v.setAlpha(1f);
+            } else {
+                Object bg = v.getTag(R.id.card_bg);
+                ((LinearLayout) v).setBackgroundColor(bg instanceof Integer ? (Integer) bg : 0xFF2B2B3D);
+                v.setScaleX(1f); v.setScaleY(1f); v.setAlpha(0.9f);
+            }
+        });
         card.setTag(l);
         cardRow.addView(card);
-    }
-
-    private void applyFocus() {
-        for (int i = 0; i < cardRow.getChildCount(); i++) {
-            View c = cardRow.getChildAt(i);
-            if (i == focusIndex) {
-                c.setScaleX(1.08f); c.setScaleY(1.08f);
-                c.setAlpha(1f);
-                ((LinearLayout)c).setBackgroundColor(0xFF4FC3F7);
-            } else {
-                c.setScaleX(1f); c.setScaleY(1f);
-                c.setAlpha(0.85f);
-            }
-        }
-    }
-
-    private void activate() {
-        View c = cardRow.getChildAt(focusIndex);
-        Launcher l = (Launcher) c.getTag();
-        if (l != null) l.launch();
     }
 
     private void startServer() {
@@ -201,12 +193,7 @@ public class HomeActivity extends Activity {
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_LEFT:  focusIndex = Math.max(0, focusIndex - 1); applyFocus(); return true;
-            case KeyEvent.KEYCODE_DPAD_RIGHT: focusIndex = Math.min(CARD_COUNT - 1, focusIndex + 1); applyFocus(); return true;
-            case KeyEvent.KEYCODE_DPAD_CENTER:
-            case KeyEvent.KEYCODE_ENTER: activate(); return true;
-        }
+        // 方向/OK 全部交给系统焦点机制处理，不再手动拦截
         return super.onKeyDown(keyCode, event);
     }
 
