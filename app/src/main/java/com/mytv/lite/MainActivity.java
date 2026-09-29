@@ -293,6 +293,11 @@ public class MainActivity extends Activity {
             else tv.setTextColor(Color.WHITE);
             final int idx = i;
             tv.setOnClickListener(v -> { play(idx); hidePanelNow(); });
+            tv.setFocusable(true);
+            tv.setOnFocusChangeListener((vv, hasF) -> {
+                if (hasF) { tv.setBackgroundColor(0x44FFFFFF); tv.setTextColor(0xFFFFB74D); }
+                else tv.setTextColor(Color.WHITE);
+            });
             channelPanel.addView(tv);
         }
     }
@@ -339,8 +344,11 @@ public class MainActivity extends Activity {
                 if (panelVisible) break;
                 play(current + 1); return true;
             case KeyEvent.KEYCODE_DPAD_LEFT:
+                // 左键：弹出频道列表（可遥控器选台）
+                if (!panelVisible) { showPanel(); return true; }
+                break;
             case KeyEvent.KEYCODE_DPAD_RIGHT:
-                if (!panelVisible) { play(keyCode == KeyEvent.KEYCODE_DPAD_RIGHT ? current + 1 : current - 1); return true; }
+                if (!panelVisible) { play(current + 1); return true; }
                 break;
             case KeyEvent.KEYCODE_MENU:
             case KeyEvent.KEYCODE_INFO:

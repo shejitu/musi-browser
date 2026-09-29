@@ -224,25 +224,19 @@ public class ReposActivity extends Activity {
         highlight();
     }
 
-    /** 一键配置：CMS 直链源 → 海报墙点播；其他 → 网页嗅探。 */
+    /** 一键配置：优先试海报墙（CMS协议），失败自动回退网页嗅探。 */
     private void openSite(Site s) {
         String api = s.api.trim();
-        boolean cmsLike = (s.type == 0 || s.type == 1 || s.type == 4)
-                && (api.contains("api.php") || api.contains("provide/vod") || api.contains("ac=videolist"));
-        if (cmsLike) {
+        boolean direct = (s.type == 0 || s.type == 1 || s.type == 4) && api.startsWith("http");
+        if (direct) {
+            // 全部直链源都先进海报墙尝试（VodActivity 内部失败会自动回退浏览器嗅探）
             VodActivity.launch(this, api, s.name);
             return;
         }
         android.content.Intent it = new android.content.Intent(this, MainActivity.class);
         it.putExtra(MainActivity.MODE, MainActivity.MODE_BROWSER);
         it.putExtra("show_sites", false);
-        String target;
-        if ((s.type == 0 || s.type == 1 || s.type == 4) && api.startsWith("http")) {
-            target = api;
-        } else {
-            target = "https://www.bing.com/search?q=" + android.net.Uri.encode(s.name + " 在线观看");
-        }
-        it.putExtra("browser_url", target);
+        it.putExtra("browser_url", "https://www.bing.com/search?q=" + android.net.Uri.encode(s.name + " 在线观看"));
         startActivity(it);
     }
 

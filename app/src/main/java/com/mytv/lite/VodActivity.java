@@ -167,7 +167,15 @@ public class VodActivity extends Activity {
             } catch (Exception e) {
                 handler.post(() -> {
                     status.setText("✗ " + e.getMessage());
-                    toast("该源不支持海报墙协议（非苹果CMS直链源），试试网页嗅探模式");
+                    toast("非CMS源，已转网页嗅探模式");
+                    // 自动回退：浏览器打开该接口地址嗅探
+                    String site = getIntent().getStringExtra("site");
+                    android.content.Intent it = new android.content.Intent(this, MainActivity.class);
+                    it.putExtra(MainActivity.MODE, MainActivity.MODE_BROWSER);
+                    it.putExtra("show_sites", false);
+                    it.putExtra("browser_url", apiBase);
+                    startActivity(it);
+                    finish();
                 });
             }
         }).start();

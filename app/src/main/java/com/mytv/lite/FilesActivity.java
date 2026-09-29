@@ -71,11 +71,18 @@ public class FilesActivity extends Activity {
         for (final File f : files) {
             TextView row = new TextView(this);
             String type = kindOf(f.getName());
-            row.setText(type + "  " + f.getName() + "   " + (f.length() / 1024 / 1024) + " MB");
-            row.setTextColor(Color.WHITE); row.setTextSize(15);
-            row.setPadding(dp(16), dp(10), dp(16), dp(10));
+            row.setText(type + "\n" + f.getName() + "   " + (f.length() / 1024 / 1024) + " MB");
+            row.setTextColor(Color.WHITE); row.setTextSize(18);
+            row.setLineSpacing(dp(4), 1f);
+            row.setPadding(dp(24), dp(18), dp(24), dp(18));
+            row.setBackgroundColor(0xFF222230);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, dp(8), 0, dp(8));
+            row.setLayoutParams(lp);
+            row.setFocusable(true);
+            row.setOnFocusChangeListener((v, hasF) -> row.setBackgroundColor(hasF ? 0xFF4FC3F7 : 0xFF222230));
             row.setOnClickListener(v -> open(f, type));
-            list.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            list.addView(row, lp);
         }
     }
 
