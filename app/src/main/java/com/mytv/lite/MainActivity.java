@@ -30,6 +30,28 @@ import java.util.Map;
  */
 public class MainActivity extends Activity {
 
+    /** 启动模式 */
+    static final String MODE = "mode";
+    static final String MODE_LIVE = "live";
+    static final String MODE_BROWSER = "browser";
+
+    public static void launch(android.content.Context ctx) {
+        android.content.Intent it = new android.content.Intent(ctx, MainActivity.class);
+        it.putExtra(MODE, MODE_LIVE);
+        ctx.startActivity(it);
+    }
+    public static void launchBrowser(android.content.Context ctx) {
+        android.content.Intent it = new android.content.Intent(ctx, MainActivity.class);
+        it.putExtra(MODE, MODE_BROWSER);
+        it.putExtra("show_sites", true);
+        ctx.startActivity(it);
+    }
+    public static void launchBrowserPlain(android.content.Context ctx) {
+        android.content.Intent it = new android.content.Intent(ctx, MainActivity.class);
+        it.putExtra(MODE, MODE_BROWSER);
+        ctx.startActivity(it);
+    }
+
     private ExoPlayer player;
     private PlayerView playerView;
     private LinearLayout channelPanel;
@@ -52,6 +74,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        String mode = getIntent().getStringExtra(MODE);
+        boolean startInBrowser = MODE_BROWSER.equals(mode);
+        boolean showSites = getIntent().getBooleanExtra("show_sites", false);
+        String pushUrl = getIntent().getStringExtra("browser_url");
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
@@ -90,10 +116,30 @@ public class MainActivity extends Activity {
 
         loadChannels();
         initPlayer();
-        if (!channels.isEmpty()) play(current);
-        // 首次启动提示如何打开设置
-        handler.postDelayed(() -> showOsd("按菜单键(INFO)频道列表 · 按搜索键进入浏览器点播 · OK键设置"), 4000);
-        startServer();
+        if (!startInBrowser && !channels.isEmpty()) play(current);
+
+        if (startInBrowser) {
+            enterBrowser();
+            String playUrl = getIntent().getStringExtra("play_url");
+            if (playUrl != null && !playUrl.isEmpty()) {
+                // 直接播放（本地文件/选集直链）
+                if (sitesHost != null) sitesHost.setVisibility(View.GONE);
+                player.stop();
+                player.setMediaItem(MediaItem.fromUri(playUrl));
+                player.prepare();
+                player.setPlayWhenReady(true);
+                showOsd("▶ " + getIntent().getStringExtra("play_title"));
+            } else if (pushUrl != null && !pushUrl.isEmpty()) {
+                if (!pushUrl.startsWith("http")) pushUrl = "https://www.bing.com/search?q=" + android.net.Uri.encode(pushUrl);
+                if (sitesHost != null) sitesHost.setVisibility(View.GONE);
+                browser.getWebView().loadUrl(pushUrl);
+                showOsd("收到推送: " + pushUrl);
+            } else if (!showSites) {
+                if (sitesHost != null) sitesHost.setVisibility(View.GONE);
+            }
+        } else {
+            handler.postDelayed(() -> showOsd("按菜单键(INFO)频道列表 · 按搜索键进入浏览器点播 · OK键设置 · 返回键回主页"), 4000);
+        }
     }
 
     private LinearLayout settingsPanel;
@@ -190,14 +236,18 @@ public class MainActivity extends Activity {
     }
 
     private void initPlayer() {
-        DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
-                .setUserAgent("Mozilla/5.0 (Linux; Android TV) MyTV/1.0")
-                .setConnectTimeoutMs(8000)
-                .setAllowCrossProtocolRedirects(true);
+        androidx.media3.datasource.HttpDataSource.Factory http = ProxyActivity.httpFactory(this);
+        // 流式播放（边下边播，不落盘）：设置较小内存缓冲，验证不依赖下载
+        androidx.media3.exoplayer.DefaultLoadControl lc = new androidx.media3.exoplayer.DefaultLoadControl.Builder()
+                .setBufferDurationsMs(4000, 12000, 500, 1500)  // 最小4秒/最大12秒内存缓冲
+                .build();
         player = new ExoPlayer.Builder(this)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(http))
+                .setLoadControl(lc)
                 .build();
         playerView.setPlayer(player);
+        // 自适应全屏：ZOOM 铺满（裁边不留黑边）；按 OK 键循环切换 ZOOM/FIT
+        playerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         player.addListener(new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
                 showOsd("播放失败：" + channels.get(current).name + "\n自动尝试下一个…");
@@ -299,11 +349,22 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_BACK:
                 if (settingsVisible) { settingsVisible = false; settingsPanel.setVisibility(View.GONE); return true; }
                 if (panelVisible) { hidePanelNow(); return true; }
-                break;
+                // 回到主页
+                if (player != null) player.setPlayWhenReady(false);
+                startActivity(new android.content.Intent(this, HomeActivity.class));
+                finish();
+                return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
             case KeyEvent.KEYCODE_ENTER:
-                if (!panelVisible && !settingsVisible) { showSettings(); return true; }
-                break;
+                if (settingsVisible) break;
+                if (panelVisible) break;
+                // 循环切换缩放：ZOOM(铺满裁边) ↔ FIT(完整留黑边)
+                if (playerView.getResizeMode() == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM)
+                    playerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FIT);
+                else
+                    playerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
+                showOsd(playerView.getResizeMode() == androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM ? "画面: 铺满全屏(裁边)" : "画面: 完整显示(黑边)");
+                return true;
             case KeyEvent.KEYCODE_SEARCH:
                 enterBrowser();
                 return true;
@@ -353,25 +414,10 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ===== 局域网控制服务器 =====
-    private LiteServer server;
-
-    private void startServer() {
-        server = new LiteServer(this, url -> {
-            // 电脑推送网址：切到浏览器模式打开
-            if (!browserMode) enterBrowser();
-            if (sitesHost != null) sitesHost.setVisibility(View.GONE);
-            if (!url.startsWith("http")) url = "https://www.bing.com/search?q=" + android.net.Uri.encode(url);
-            browser.getWebView().loadUrl(url);
-            showOsd("收到推送: " + url);
-        });
-        server.start();
-        handler.postDelayed(() -> showOsd("局域网控制已开启: " + LiteServer.localIp(this) + ":8080"), 1500);
-    }
+    // ===== 局域网控制服务器（由 HomeActivity 统一启动）=====
 
     @Override
     protected void onDestroy() {
-        if (server != null) server.stop();
         if (player != null) player.release();
         super.onDestroy();
     }

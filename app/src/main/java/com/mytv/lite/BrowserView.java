@@ -94,6 +94,7 @@ public class BrowserView extends FrameLayout {
                 statusChip.setText(p < 100 ? "加载中 " + p + "%  " + v.getUrl() : (v.getTitle() == null ? "" : v.getTitle()));
             }
         });
+        ProxyActivity.applyToWebView(web, act);
         // 视频嗅探：拦截所有资源请求，发现视频流地址记录下来
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) { return false; }

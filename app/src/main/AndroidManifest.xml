@@ -18,7 +18,7 @@
         android:banner="@drawable/banner">
 
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:exported="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden">
@@ -28,5 +28,30 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".MainActivity" android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".SettingsActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity android:name=".ReposActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity android:name=".ProxyActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity android:name=".VodActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity android:name=".FilesActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity android:name=".RepoPickerActivity" android:exported="false"
+            android:screenOrientation="landscape" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.mytv.lite.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>
