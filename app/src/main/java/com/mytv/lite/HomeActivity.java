@@ -29,7 +29,7 @@ public class HomeActivity extends Activity {
     private FrameLayout contentHost;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
-    private static final int CARD_COUNT = 6;
+    private static final int CARD_COUNT = 7;
     private final Runnable clockTick = new Runnable() {
         @Override public void run() {
             if (clock != null)
@@ -102,6 +102,9 @@ public class HomeActivity extends Activity {
         });
         addCard("🎬", "影视点播", "YouTube/B站/影视站 · 嗅探点播", 0xFF3D2B1F, new Launcher() {
             @Override public void launch() { MainActivity.launchBrowser(HomeActivity.this); }
+        });
+        addCard("📺", "影视频道", "仓库推荐影视 · 海报墙", 0xFF2B1F3D, new Launcher() {
+            @Override public void launch() { ChannelActivity.launch(HomeActivity.this); }
         });
         addCard("📁", "本地文件", "Download/download · 播放/安装", 0xFF33301F, new Launcher() {
             @Override public void launch() { FilesActivity.launch(HomeActivity.this); }

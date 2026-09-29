@@ -44,7 +44,14 @@ public class SitesPanel {
         for (Site s : SITES) {
             Button b = new Button(act);
             b.setText(s.name + "   " + s.desc);
-            b.setTextSize(15);
+            b.setTextSize(16);
+            b.setPadding(24, 14, 24, 14);
+            b.setFocusable(true);
+            b.setFocusableInTouchMode(true);
+            b.setOnFocusChangeListener((v, hasF) -> {
+                b.setTextColor(hasF ? 0xFFFFB74D : Color.WHITE);
+                b.setBackgroundColor(hasF ? 0x444FC3F7 : 0xFF222230);
+            });
             b.setOnClickListener(v -> { browser.getWebView().loadUrl(s.url); onClose.run(); });
             box.addView(b);
         }
