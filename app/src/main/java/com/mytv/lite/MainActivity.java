@@ -331,7 +331,9 @@ public class MainActivity extends Activity {
         if (browserMode) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
                 if (sitesHost != null && sitesHost.getVisibility() == View.VISIBLE) { sitesHost.setVisibility(View.GONE); return true; }
-                if (!browser.handleBack()) exitBrowser();
+                if (browser.handleBack()) return true;
+                // 无页可退：回主页（finish 本页，Home 在栈底自然显示）
+                finish();
                 return true;
             }
             return super.onKeyDown(keyCode, event);

@@ -100,8 +100,8 @@ public class HomeActivity extends Activity {
         addCard("📚", "仓库管理", "TVBox 单仓/多仓 · 拉取配置", 0xFF3A1F33, new Launcher() {
             @Override public void launch() { ReposActivity.launch(HomeActivity.this); }
         });
-        addCard("🎬", "影视点播", "海报墙 · 搜索 · 选集", 0xFF3D2B1F, new Launcher() {
-            @Override public void launch() { RepoPickerActivity.launch(HomeActivity.this); }
+        addCard("🎬", "影视点播", "YouTube/B站/影视站 · 嗅探点播", 0xFF3D2B1F, new Launcher() {
+            @Override public void launch() { MainActivity.launchBrowser(HomeActivity.this); }
         });
         addCard("📁", "本地文件", "Download/download · 播放/安装", 0xFF33301F, new Launcher() {
             @Override public void launch() { FilesActivity.launch(HomeActivity.this); }

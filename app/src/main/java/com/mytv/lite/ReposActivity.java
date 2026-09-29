@@ -224,12 +224,10 @@ public class ReposActivity extends Activity {
         highlight();
     }
 
-    /** 一键配置：优先试海报墙（CMS协议），失败自动回退网页嗅探。 */
+    /** 一键配置：http 接口源一律先进海报墙尝试（失败自动回退网页）；非 http 的 Spider 走搜索嗅探。 */
     private void openSite(Site s) {
         String api = s.api.trim();
-        boolean direct = (s.type == 0 || s.type == 1 || s.type == 4) && api.startsWith("http");
-        if (direct) {
-            // 全部直链源都先进海报墙尝试（VodActivity 内部失败会自动回退浏览器嗅探）
+        if (api.startsWith("http")) {
             VodActivity.launch(this, api, s.name);
             return;
         }

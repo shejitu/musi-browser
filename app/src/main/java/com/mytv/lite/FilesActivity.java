@@ -53,6 +53,8 @@ public class FilesActivity extends Activity {
         root.addView(sc, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
 
         refresh();
+        // 初始焦点到列表第一项（遥控器才能上下选择）
+        list.post(() -> { if (list.getChildCount() > 0) list.getChildAt(0).requestFocus(); });
     }
 
     private void refresh() {
@@ -80,9 +82,11 @@ public class FilesActivity extends Activity {
             lp.setMargins(0, dp(8), 0, dp(8));
             row.setLayoutParams(lp);
             row.setFocusable(true);
+            row.setFocusableInTouchMode(true);
+            row.setClickable(true);
             row.setOnFocusChangeListener((v, hasF) -> row.setBackgroundColor(hasF ? 0xFF4FC3F7 : 0xFF222230));
             row.setOnClickListener(v -> open(f, type));
-            list.addView(row, lp);
+            list.addView(row);
         }
     }
 
@@ -109,11 +113,11 @@ public class FilesActivity extends Activity {
                 it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(it);
             } else if (type.contains("视频") || type.contains("音频")) {
-                // 走自家播放器（全屏+嗅探一致的体验）
+                // 走自家播放器（统一 FileProvider，避免 file:// 在新安卓上被禁止）
                 Intent it = new Intent(this, MainActivity.class);
                 it.putExtra(MainActivity.MODE, MainActivity.MODE_BROWSER);
                 it.putExtra("show_sites", false);
-                it.putExtra("play_url", Uri.fromFile(f).toString());
+                it.putExtra("play_url", uri.toString());
                 it.putExtra("play_title", f.getName());
                 startActivity(it);
             } else {
