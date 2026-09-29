@@ -1,0 +1,11 @@
+# Built artifacts
+build/
+app/build/
+.gradle/
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Optional: keep mytv.jks out if you regenerate your own; the bundled one is for personal use only
