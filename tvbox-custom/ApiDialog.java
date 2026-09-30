@@ -117,10 +117,13 @@ public class ApiDialog extends BaseDialog {
             });
             row.addView(b);
         }
-        // 插到二维码/输入区的顶部
+        // 插到右栏标题(tvAddress)下方
         try {
-            android.view.ViewGroup inputsRoot = (android.view.ViewGroup) findViewById(R.id.tvAddress).getParent();
-            ((android.view.ViewGroup) inputsRoot.getParent()).addView(llRec, 1);
+            android.view.ViewGroup rightCol = (android.view.ViewGroup) findViewById(R.id.tvAddress).getParent();
+            android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+            lp.setMargins(0, 0, 0, pad8);
+            rightCol.addView(llRec, 1, lp);
         } catch (Throwable ignore) {}
 
         findViewById(R.id.inputSubmit).setOnClickListener(new View.OnClickListener() {
