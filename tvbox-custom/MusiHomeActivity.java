@@ -2,7 +2,6 @@ package com.github.tvbox.osc.ui.activity;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -17,6 +16,7 @@ import android.widget.Toast;
 
 import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.util.HawkConfig;
+import com.orhanobut.hawk.Hawk;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -114,8 +114,7 @@ public class MusiHomeActivity extends Activity {
 
     private String shortSource() {
         try {
-            SharedPreferences sp = getSharedPreferences("hawk", 0);
-            String u = sp.getString(HawkConfig.API_URL, "");
+            String u = Hawk.get(HawkConfig.API_URL, "");
             if (u == null || u.isEmpty()) return "默认内置源";
             return u.length() > 40 ? u.substring(0, 40) + "…" : u;
         } catch (Throwable t) { return "默认内置源"; }
