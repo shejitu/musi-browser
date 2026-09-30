@@ -35,6 +35,17 @@ public class MusiHomeActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        try {
+            buildUi(savedInstanceState);
+        } catch (Throwable t) {
+            // 慕思防护: 卡片页任何异常都降级进 TVBox 原生首页, 保证可用
+            saveCrash("MusiHome onCreate", t);
+            try { startActivity(new Intent(this, HomeActivity.class)); } catch (Throwable ignore) {}
+            finish();
+        }
+    }
+
+    private void buildUi(Bundle savedInstanceState) {
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(0xFF0D0D14);
 
@@ -178,6 +189,15 @@ public class MusiHomeActivity extends Activity {
             @Override public void onClick(View v) { action.run(); }
         });
         grid.addView(card);
+    }
+
+    private void saveCrash(String where, Throwable t) {
+        try {
+            java.io.File f = new java.io.File(getExternalFilesDir(null), "musi_crash.txt");
+            java.io.FileWriter w = new java.io.FileWriter(f, true);
+            w.write("== " + where + " ==\n" + android.util.Log.getStackTraceString(t) + "\n\n");
+            w.close();
+        } catch (Throwable ignore) {}
     }
 
     private void go(Class<?> cls) {
