@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>慕思影视 · 电视控制台</title>
+<style>
+body{font-family:-apple-system,sans-serif;max-width:620px;margin:0 auto;padding:0 16px 40px;background:#14141c;color:#eee}
+h1{font-size:22px;padding:20px 0 4px;color:#fff}h1 span{color:#FF8C42}
+.sub{color:#888;font-size:13px;margin-bottom:18px}
+.card{background:#1e1e2a;border-radius:12px;padding:16px;margin-bottom:14px}
+.card h3{margin:0 0 10px;font-size:16px;color:#FF8C42}
+input{width:100%;box-sizing:border-box;font-size:15px;padding:10px 12px;margin:4px 0 10px;background:#13131c;border:1px solid #33334a;border-radius:8px;color:#fff}
+button,.btn{display:inline-block;width:100%;font-size:15px;padding:10px;margin:2px 0;background:#FF8C42;color:#fff;border:0;border-radius:8px;cursor:pointer;text-align:center;text-decoration:none}
+.btn2{background:#2a2a3d}.btn3{background:#3d2b4f}
+.rec{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+.rec button{width:auto;flex:1 1 30%;margin:0;background:#2a2a3d;font-size:13px;padding:9px 4px}
+.rec button.hot{background:#FF8C42}
+.msg{color:#7ec97e;font-size:13px;min-height:18px;margin-top:6px}
+.tip{color:#777;font-size:12px;line-height:1.6;margin-top:6px}
+</style>
+<script src="jquery.js"></script>
+</head>
+<body>
+<h1>🐱 慕思<span>影视</span></h1>
+<div class="sub">电视控制台 · 电脑推送配置 / 文件 / 代理</div>
+
+<div class="card">
+  <h3>📺 仓库配置（点即切换 / 输入推送）</h3>
+  <div class="rec">
+    <button onclick="setApi('https://raw.githubusercontent.com/shejitu/musi-browser/master/musi.json',this)">慕思聚合</button>
+    <button onclick="setApi('http://home.jundie.top:81/top98.json',this)">俊佬</button>
+    <button onclick="setApi('http://ztha.top/TVBox/GYCK.json',this)">挺好GYCK</button>
+    <button onclick="setApi('https://cnb.cool/fish2018/xs/-/git/raw/main/api.json',this)">鱼2018</button>
+    <button onclick="setApi('http://xhztv.top/dc',this)">小盒子多仓</button>
+    <button onclick="setApi('http://xmbjm.fh4u.org/dc.txt',this)">拾光多仓</button>
+  </div>
+  <input id="api_url" placeholder="或手动输入仓库/配置地址，点下方推送到电视">
+  <button onclick="api()">推送仓库到电视并打开</button>
+  <div class="msg" id="api_msg"></div>
+</div>
+
+<div class="card">
+  <h3>🧦 直播源 / EPG / 代理</h3>
+  <input id="live_url" placeholder="直播源地址 (optional)"><button class="btn2" onclick="live()">推送直播源</button>
+  <input id="epg_url" placeholder="直播EPG地址 (optional, 如 https://epg.51zmt.top:8001/api/diyp/)"><button class="btn2" onclick="epg()">推送EPG</button>
+  <input id="proxy_server" placeholder="socks代理 IP:端口 (如 192.168.1.5:7890, 电脑Clash需允许局域网)"><button class="btn3" onclick="proxys()">推送代理</button>
+  <div class="msg" id="px_msg"></div>
+</div>
+
+<div class="card">
+  <h3>🔎 搜索 / 推送播放</h3>
+  <input id="search_key_word" placeholder="输入关键词在电视上搜索影视"><button class="btn2" onclick="search()">搜索</button>
+  <input id="push_url" placeholder="推送视频/网页地址到电视播放"><button class="btn2" onclick="push()">推送到电视播放</button>
+</div>
+
+<div class="card">
+  <h3>📁 文件传输</h3>
+  <input type="file" id="file_uploader" style="display:none" onchange="uploadTip()" multiple>
+  <button onclick="uploadFile()">上传文件到电视（Download/）</button>
+  <div class="tip">上传后文件在电视存储 Download/ 下，TVBox「文件」与播放器可直接读取</div>
+  <div class="weui-cells" id="file_list"></div>
+</div>
+
+<div class="msg" id="up_msg"></div>
+
+<script>
+function setApi(url, btn){
+  $('#api_url').val(url);
+  $('.rec button').removeClass('hot'); $(btn).addClass('hot');
+  doAction('api', {url: url}, function(){ $('#api_msg').text('已推送: '+url+' — 回电视看加载结果'); });
+}
+function api(){ var u=$('#api_url').val(); if(!u)return; doAction('api',{url:u},function(){$('#api_msg').text('已推送到电视');}); }
+function live(){ doAction('live',{url:$('#live_url').val()}); }
+function epg(){ doAction('epg',{url:$('#epg_url').val()}); }
+function proxys(){ var v=$('#proxy_server').val(); doAction('proxys',{url:v},function(){$('#px_msg').text('代理已推送: '+v);}); }
+function search(){ doAction('search',{word:$('#search_key_word').val()}); }
+function push(){ doAction('push',{url:$('#push_url').val()}); }
+function doAction(action, kv, cb){
+  kv['do']=action;
+  $.post('/action', kv, function(d){ if(cb)cb(d); });
+  return false;
+}
+</script>
+<script src="script.js"></script>
+</body>
+</html>
