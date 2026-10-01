@@ -87,9 +87,7 @@ public class ApiDialog extends BaseDialog {
             {"慕思聚合", "https://raw.githubusercontent.com/shejitu/musi-browser/master/musi.json"},
             {"俊佬", "http://home.jundie.top:81/top98.json"},
             {"挺好GYCK", "http://ztha.top/TVBox/GYCK.json"},
-            {"鱼2018", "https://cnb.cool/fish2018/xs/-/git/raw/main/api.json"},
             {"小盒子多仓", "http://xhztv.top/dc"},
-            {"拾光多仓", "http://xmbjm.fh4u.org/dc.txt"},
         };
         android.widget.LinearLayout row = null;
         android.view.ViewGroup rootVp = (android.view.ViewGroup) findViewById(R.id.tvAddress).getParent().getParent().getParent();
