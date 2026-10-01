@@ -17,6 +17,7 @@ import com.github.tvbox.osc.ui.activity.HomeActivity;
 import com.github.tvbox.osc.ui.adapter.ApiHistoryDialogAdapter;
 import com.github.tvbox.osc.ui.tv.QRCodeGen;
 import com.github.tvbox.osc.util.DefaultConfig;
+import com.github.tvbox.osc.api.ApiConfig;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.hjq.permissions.OnPermissionCallback;
 import com.hjq.permissions.XXPermissions;
@@ -144,8 +145,45 @@ public class ApiDialog extends BaseDialog {
                     if (history.size() > 20)
                         history.remove(20);
                     Hawk.put(HawkConfig.API_HISTORY, history);
-                    listener.onchange(newApi);
+                    Hawk.put(HawkConfig.API_URL, newApi);
                     dismiss();
+                    // 慕思定制: 立即预载配置 — 若是多仓, 马上弹出子仓选择(不必退回主界面)
+                    try {
+                        ApiConfig.get().loadConfig(false, new ApiConfig.LoadConfigCallback() {
+                            @Override public void success() {
+                                if (ApiConfig.get().multiRepoList != null && !ApiConfig.get().multiRepoList.isEmpty()) {
+                                    List<String[]> repos = ApiConfig.get().multiRepoList;
+                                    String[] names = new String[repos.size()];
+                                    for (int i = 0; i < repos.size(); i++) names[i] = repos.get(i)[0];
+                                    android.app.Activity act = (android.app.Activity) getContext();
+                                    act.runOnUiThread(() -> {
+                                        android.widget.ListView lv = new android.widget.ListView(getContext());
+                                        lv.setAdapter(new android.widget.ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, names));
+                                        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(getContext())
+                                                .setTitle("多仓列表 — 选择一个仓库载入 (OK键选中)")
+                                                .setView(lv)
+                                                .setNegativeButton("取消", null)
+                                                .create();
+                                        lv.setOnItemClickListener((parent, view, which, id) -> {
+                                            dlg.dismiss();
+                                            String subUrl = repos.get(which)[1];
+                                            Hawk.put(HawkConfig.API_URL, subUrl);
+                                            ApiConfig.get().multiRepoList = null;
+                                            ArrayList<String> h2 = Hawk.get(HawkConfig.API_HISTORY, new ArrayList<String>());
+                                            if (!h2.contains(subUrl)) h2.add(0, subUrl);
+                                            Hawk.put(HawkConfig.API_HISTORY, h2);
+                                            if (listener != null) listener.onchange(subUrl);
+                                        });
+                                        dlg.show();
+                                        lv.requestFocus();
+                                        lv.setSelection(0);
+                                    });
+                                }
+                            }
+                            @Override public void retry() {}
+                            @Override public void error(String msg) {}
+                        }, (android.app.Activity) getContext());
+                    } catch (Throwable ignore) {}
                 }
                 // Capture Live input into Settings & Live History (max 20)
                 Hawk.put(HawkConfig.LIVE_URL, newLive);

@@ -54,14 +54,26 @@ button,.btn{display:inline-block;width:100%;font-size:15px;padding:10px;margin:2
 
 <div class="card">
   <h3>📁 文件传输</h3>
-  <input type="file" id="file_uploader" style="display:none" onchange="uploadTip()" multiple>
+  <input type="file" id="file_uploader" style="display:none" onchange="doUploadDirect()" multiple>
   <button onclick="uploadFile()">上传文件到电视（Download/）</button>
-  <div class="tip">上传后文件在电视存储 Download/ 下，TVBox「文件」与播放器可直接读取</div>
-  <div class="weui-cells" id="file_list"></div>
+  <div class="tip">选择文件后自动上传到电视 Download/ 目录，电视端「文件」可直接查看播放</div>
+  <div class="msg" id="up_msg"></div>
 </div>
 
-<div class="msg" id="up_msg"></div>
-
+<script>
+function doUploadDirect(){
+  var files = document.getElementById('file_uploader').files;
+  if(files.length<=0) return;
+  var fd = new FormData();
+  fd.append('path','Download');
+  for(var i=0;i<files.length;i++) fd.append('files-'+i, files[i]);
+  $('#up_msg').text('上传中…');
+  $.ajax({url:'/upload',type:'post',data:fd,processData:false,contentType:false,
+    success:function(){$('#up_msg').text('✓ 上传成功: '+files.length+' 个文件 → 电视 Download/');},
+    error:function(){$('#up_msg').text('✗ 上传失败，请重试');}
+  });
+}
+</script>
 <script>
 function setApi(url, btn){
   $('#api_url').val(url);
