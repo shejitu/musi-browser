@@ -84,15 +84,15 @@ public class ApiDialog extends BaseDialog {
         int pad8 = (int) (8 * getContext().getResources().getDisplayMetrics().density);
         llRec.setPadding(pad8, pad8 / 2, pad8, 0);
         String[][] recs = {
-            {"慕思聚合", "https://raw.githubusercontent.com/shejitu/musi-browser/master/musi.json"},
-            {"俊佬", "http://home.jundie.top:81/top98.json"},
             {"挺好GYCK", "http://ztha.top/TVBox/GYCK.json"},
             {"小盒子多仓", "http://xhztv.top/dc"},
+            {"慕思聚合", "https://raw.githubusercontent.com/shejitu/musi-browser/master/musi.json"},
+            {"俊佬", "http://home.jundie.top:81/top98.json"},
         };
         android.widget.LinearLayout row = null;
         android.view.ViewGroup rootVp = (android.view.ViewGroup) findViewById(R.id.tvAddress).getParent().getParent().getParent();
         for (int i = 0; i < recs.length; i++) {
-            if (i % 3 == 0) {
+            if (i % 4 == 0) {   // 慕思定制: 每行4个, 第5个起另起一行
                 row = new android.widget.LinearLayout(getContext());
                 llRec.addView(row, new android.widget.LinearLayout.LayoutParams(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
             }
