@@ -146,20 +146,22 @@ public class ApiDialog extends BaseDialog {
                         history.remove(20);
                     Hawk.put(HawkConfig.API_HISTORY, history);
                     Hawk.put(HawkConfig.API_URL, newApi);
+                    // 慕思定制: 先捕获Context再dismiss(dismiss后getContext()返回null会导致崩溃)
+                    android.content.Context ctx = getContext();
                     dismiss();
-                    // 慕思定制: 立即预载配置 — 若是多仓, 马上弹出子仓选择(不必退回主界面)
+                    // 立即预载配置 — 若是多仓, 马上弹出子仓选择(不必退回主界面)
                     try {
+                        final android.app.Activity actFinal = (android.app.Activity) ctx;
                         ApiConfig.get().loadConfig(false, new ApiConfig.LoadConfigCallback() {
                             @Override public void success() {
                                 if (ApiConfig.get().multiRepoList != null && !ApiConfig.get().multiRepoList.isEmpty()) {
                                     List<String[]> repos = ApiConfig.get().multiRepoList;
                                     String[] names = new String[repos.size()];
                                     for (int i = 0; i < repos.size(); i++) names[i] = repos.get(i)[0];
-                                    android.app.Activity act = (android.app.Activity) getContext();
-                                    act.runOnUiThread(() -> {
-                                        android.widget.ListView lv = new android.widget.ListView(getContext());
-                                        lv.setAdapter(new android.widget.ArrayAdapter<>(getContext(), android.R.layout.simple_list_item_1, names));
-                                        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(getContext())
+                                    actFinal.runOnUiThread(() -> {
+                                        android.widget.ListView lv = new android.widget.ListView(actFinal);
+                                        lv.setAdapter(new android.widget.ArrayAdapter<>(actFinal, android.R.layout.simple_list_item_1, names));
+                                        android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(actFinal)
                                                 .setTitle("多仓列表 — 选择一个仓库载入 (OK键选中)")
                                                 .setView(lv)
                                                 .setNegativeButton("取消", null)
