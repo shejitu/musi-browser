@@ -1,7 +1,7 @@
 # 慕思影视（TVBox 内核版）— Bug 记录与解决方案汇总
 
 > 面向接手的 AI 协作者。基座：takagen99/TVBoxOSC（见 tvbox-custom/README.md 的构建说明）。
-> 当前版本 v2.1。包名 com.github.tvbox.osc.tk（注意：曾计划改 com.mytv.musi，v1.4 起沿用原包名避免升级冲突）。
+> 当前版本 v2.2。包名 com.github.tvbox.osc.tk（注意：曾计划改 com.mytv.musi，v1.4 起沿用原包名避免升级冲突）。
 
 ---
 
@@ -74,6 +74,40 @@
 子仓本身又是多仓格式时（罕见），当前逻辑：载入子仓→再次识别 urls→再弹选择，理论已支持但未实测。
 
 ---
+
+### 6. 控制台"推送"点了没反应（v2.2 修复）
+- 现象：9978 控制台点"推送仓库到电视"、"推送直播源/EPG/代理"，电视端毫无反应。
+- 根因：`ControlManager` 发出 `RefreshEvent(TYPE_API_URL_CHANGE/LIVE/EPG/PROXYS_CHANGE)` 后，**没有任何订阅者真正处理**——只有 ApiDialog 在打开时把地址填进输入框。
+- 解法：
+  - `App.onCreate` 注册 EventBus，新增 `onConsolePush()`：API_URL 推送→存 Hawk+历史+Toast；LIVE/EPG/代理→存 Hawk+Toast（代理下次播放生效）。
+  - `HomeActivity.refresh()` 收到 TYPE_API_URL_CHANGE 时若正在点播页就地 `initData()` 重载（多仓会自动弹子仓选择）。
+  - 12345 的 `/api/pushConfig`、`/api/pushProxy` 走同一事件，同步生效。
+- 另修上游 bug：`TYPE_PROXYS_CHANGE` 与 `TYPE_SET_DANMU_SETTINGS` **值撞车（都是 18）**——弹幕开关 post 的是 Boolean，会被误读成代理地址。已将前者改为 100。
+
+### 7. ApiDialog 提交普通单仓后设置页不刷新（v2.2 修复，v2.1 回归）
+- 现象：v2.1 重构后，提交普通单仓 URL 只存 Hawk，不调 `listener.onchange()`（基座原版会调），设置页显示的地址还是旧的。
+- 解法：预载 success 回调里非多仓分支补 `listener.onchange(newApi)`；error 回调加 Toast（之前预载失败静默，用户不知道地址没生效）。
+
+### 8. 存的多仓地址下次进点播页无处理（v2.2 修复）
+- 现象：多仓地址提交后若取消子仓选择，API_URL 存的是多仓地址；下次进"影视点播"时 parseJson 提前 return，页面空数据且无任何提示。
+- 解法：`HomeActivity` loadConfig success 回调里检测 `multiRepoList` 非空→弹子仓选择（与 ApiDialog 同款 ListView）；取消则清空标记后照常初始化。
+
+### 9. MusiHomeActivity 无默认焦点（v2.2 修复）
+- 现象：卡片页启动后遥控器首次按键焦点乱跳。
+- 解法：buildUi 末尾 `grid.getChildAt(0).requestFocus()`。
+
+### 10. 控制台上传接口问题（v2.2 加固）
+- `RemoteServer` `/upload` 等接口异常被吞掉仍回 "OK"，前端误以为成功→现回 500 便于排查。
+- 路径穿越防护：`path`/`fn` 来自局域网客户端，现做 canonical 路径校验，逃逸则跳过。
+- `unzip()` zip-slip 防护：跳过 `../` 逃逸条目。
+
+### 11. aapt2 34 构建兼容（v2.2）
+- `res/values/strings.xml`、`values-zh/strings.xml` 里有 `//` 行注释（基座原样），aapt2 34 报错 "plain text not allowed"→已转为标准 `<!-- -->` 注释。
+- 教训：基座升级后留意构建工具链的严格性变化。
+
+### 12. 定制目录结构化（v2.2）
+- 之前"直接改在源码里"的修复（getRes 空保护、ApiConfig 多仓识别）没有收进 tvbox-custom，导致换机器/重拉基座时丢失。
+- 解法：tvbox-custom 改为按源码树组织（`app/src/main/...` 一一对应），应用时 `cp -r tvbox-custom/app/* app/` 即可，不再需要手动映射表。
 
 ## 构建速查
 ```

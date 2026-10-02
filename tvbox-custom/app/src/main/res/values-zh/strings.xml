@@ -4,7 +4,7 @@
     <string name="app_home">首页</string>
     <string name="app_source">https://raw.githubusercontent.com/shejitu/musi-browser/master/musi.json</string>
 
-    // Home Page //
+    <!-- Home Page //-->
     <string name="hm_ok">加载成功</string>
     <string name="hm_notok">加载失败</string>
     <string name="hm_retry">重试</string>
@@ -25,7 +25,7 @@
     <string name="hm_hist_del">已删除当前记录</string>
     <string name="hm_cache_del">已删除缓存</string>
 
-    // Play Detail Page //
+    <!-- Play Detail Page //-->
     <string name="det_play">播放</string>
     <string name="det_expand">全屏</string>
     <string name="det_search">快搜</string>
@@ -48,7 +48,7 @@
     <string name="det_des"></string>
     <string name="det_desc">简介</string>
 
-    // Settings Menu Page //
+    <!-- Settings Menu Page //-->
     <string name="mn_config">配置地址</string>
     <string name="mn_home">数据源</string>
     <string name="mn_home_show">数据源显示</string>
@@ -77,7 +77,7 @@
     <string name="mn_reset">重置</string>
     <string name="mn_fastsearch">聚搜</string>
 
-    // Settings Dialog Pop-Up //
+    <!-- Settings Dialog Pop-Up //-->
     <string name="dia_source">请选择数据源</string>
     <string name="dia_hm_type">请选择列表数据</string>
     <string name="dia_hm_icon">首页按钮位置</string>
@@ -99,7 +99,7 @@
     <string name="dia_reset">确定重置将清除配置</string>
     <string name="dia_media_setting_title">播放器设置</string>
 
-    // Settings Backup Restore Page //
+    <!-- Settings Backup Restore Page //-->
     <string name="set_bkup_ok">备份成功!</string>
     <string name="set_bkup_del">备份删除</string>
     <string name="set_bkup_fail">备份失败!</string>
@@ -112,7 +112,7 @@
     <string name="set_permission_fail1">获取存储权限失败</string>
     <string name="set_permission_fail2">获取存储权限失败,请在系统设置中开启</string>
 
-    // Activity Page //
+    <!-- Activity Page //-->
     <string name="act_app">我的应用</string>
     <string name="act_app_sel">确定键删除当前选中应用</string>
     <string name="act_app_rm">删除应用</string>
@@ -137,20 +137,20 @@
     <string name="act_player">播放器</string>
     <string name="act_system">系统</string>
 
-    // Search Page //
+    <!-- Search Page //-->
     <string name="search_input">输入内容不能为空</string>
     <string name="search_site">没有指定搜索源</string>
     <string name="search_checkAll">全选</string>
     <string name="search_clearAll">全不选</string>
 
-    // Fast Search Page //
+    <!-- Fast Search Page //-->
     <string name="fs_show_all">全部显示</string>
     <string name="fs_results">搜索结果</string>
     <string name="global_search">全局搜索</string>
     <string name="search">搜索</string>
     <string name="Select_source">选择搜索源</string>
 
-    // VOD //
+    <!-- VOD //-->
     <string name="vod_audio">切换音轨</string>
     <string name="vod_no_audio">没有音轨</string>
     <string name="vod_sub_option">字幕选项</string>
@@ -167,7 +167,7 @@
     <string name="vod_remaining_time">影片剩余</string>
     <string name="vod_ends_at">影片结束</string>
 
-    // EXO Player
+    <!-- EXO Player-->
     <string name="exo_track_selection_title_video">视频</string>
     <string name="exo_track_selection_title_audio">音频</string>
     <string name="exo_track_selection_title_text">文字</string>

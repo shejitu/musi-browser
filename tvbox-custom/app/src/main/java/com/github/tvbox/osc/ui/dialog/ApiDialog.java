@@ -151,6 +151,7 @@ public class ApiDialog extends BaseDialog {
                     dismiss();
                     // 立即预载配置 — 若是多仓, 马上弹出子仓选择(不必退回主界面)
                     try {
+                        final String apiFinal = newApi;
                         final android.app.Activity actFinal = (android.app.Activity) ctx;
                         ApiConfig.get().loadConfig(false, new ApiConfig.LoadConfigCallback() {
                             @Override public void success() {
@@ -180,11 +181,22 @@ public class ApiDialog extends BaseDialog {
                                         lv.requestFocus();
                                         lv.setSelection(0);
                                     });
+                                } else {
+                                    // 慕思修复 v2.2: 普通单仓提交也要通知监听者（恢复基座行为，刷新设置页显示）
+                                    if (listener != null) listener.onchange(apiFinal);
                                 }
                             }
                             @Override public void retry() {}
-                            @Override public void error(String msg) {}
-                        }, (android.app.Activity) getContext());
+                            @Override public void error(String msg) {
+                                // 慕思修复 v2.2: 预载失败给提示（之前静默失败，用户不知道地址没生效）
+                                try {
+                                    final String m2 = msg;
+                                    actFinal.runOnUiThread(() ->
+                                        android.widget.Toast.makeText(actFinal,
+                                            "仓库地址加载失败: " + m2, android.widget.Toast.LENGTH_LONG).show());
+                                } catch (Throwable ignore) {}
+                            }
+                        }, actFinal);
                     } catch (Throwable ignore) {}
                 }
                 // Capture Live input into Settings & Live History (max 20)

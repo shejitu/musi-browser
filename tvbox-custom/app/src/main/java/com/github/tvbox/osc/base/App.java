@@ -16,6 +16,7 @@ import com.github.tvbox.osc.data.AppDataManager;
 import com.github.tvbox.osc.server.ControlManager;
 import com.github.tvbox.osc.util.EpgUtil;
 import com.github.tvbox.osc.util.FileUtils;
+import com.github.tvbox.osc.event.RefreshEvent;
 import com.github.tvbox.osc.util.HawkConfig;
 import com.github.tvbox.osc.util.LocaleHelper;
 import com.github.tvbox.osc.util.LOG;
@@ -25,6 +26,9 @@ import com.github.tvbox.osc.util.SubtitleHelper;
 import com.hjq.permissions.XXPermissions;
 import com.kingja.loadsir.core.LoadSir;
 import com.orhanobut.hawk.Hawk;
+import org.greenrobot.eventbus.EventBus;
+import org.greenrobot.eventbus.Subscribe;
+import org.greenrobot.eventbus.ThreadMode;
 import com.p2p.P2PClass;
 import com.whl.quickjs.android.QuickJSLoader;
 import com.yanzhenjie.andserver.AndServer;
@@ -86,6 +90,8 @@ public class App extends MultiDexApplication {
         EpgUtil.init();
         // 初始化Web服务器
         ControlManager.init(this);
+        // 慕思定制 v2.2: 订阅电脑控制台推送事件（之前发出后无人处理，推送按钮点了没反应）
+        try { EventBus.getDefault().register(this); } catch (Throwable ignore) {}
         //初始化数据库
         AppDataManager.init();
         LoadSir.beginBuilder()
@@ -199,6 +205,42 @@ public class App extends MultiDexApplication {
 
     public String getDashData() {
         return dashData;
+    }
+
+    // 慕思定制 v2.2: 电脑控制台推送（9978 /action 与 12345 /api/push*）真正落盘生效
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void onConsolePush(RefreshEvent event) {
+        String url = event.obj == null ? "" : String.valueOf(event.obj).trim();
+        switch (event.type) {
+            case RefreshEvent.TYPE_API_URL_CHANGE: {
+                if (url.isEmpty()) return;
+                Hawk.put(HawkConfig.API_URL, url);
+                java.util.ArrayList<String> h = Hawk.get(HawkConfig.API_HISTORY, new java.util.ArrayList<String>());
+                if (!h.contains(url)) h.add(0, url);
+                if (h.size() > 20) h.remove(20);
+                Hawk.put(HawkConfig.API_HISTORY, h);
+                android.widget.Toast.makeText(this, "已收到仓库推送，正在加载", android.widget.Toast.LENGTH_SHORT).show();
+                break;
+            }
+            case RefreshEvent.TYPE_LIVE_URL_CHANGE: {
+                Hawk.put(HawkConfig.LIVE_URL, url);
+                android.widget.Toast.makeText(this, "直播源已更新，下次进入直播生效", android.widget.Toast.LENGTH_SHORT).show();
+                break;
+            }
+            case RefreshEvent.TYPE_EPG_URL_CHANGE: {
+                Hawk.put(HawkConfig.EPG_URL, url);
+                android.widget.Toast.makeText(this, "EPG 地址已更新", android.widget.Toast.LENGTH_SHORT).show();
+                break;
+            }
+            case RefreshEvent.TYPE_PROXYS_CHANGE: {
+                Hawk.put(HawkConfig.PROXY_SERVER, url);
+                android.widget.Toast.makeText(this, url.isEmpty() ? "代理已清除" : "代理已更新: " + url,
+                        android.widget.Toast.LENGTH_SHORT).show();
+                break;
+            }
+            default:
+                break;
+        }
     }
 
     public static void startWebserver() {

@@ -31,6 +31,13 @@ import static android.view.ViewGroup.LayoutParams;
 public class MusiHomeActivity extends Activity {
 
     private TextView tvDate;
+    private Runnable clockRunnable;
+
+    @Override
+    protected void onDestroy() {
+        if (tvDate != null && clockRunnable != null) tvDate.removeCallbacks(clockRunnable);
+        super.onDestroy();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -118,6 +125,10 @@ public class MusiHomeActivity extends Activity {
         root.addView(bottom, bp);
 
         setContentView(root);
+        // 慕思修复 v2.2: 电视端默认给第一张卡片焦点，否则遥控器首次按键焦点乱跳
+        try {
+            if (grid.getChildCount() > 0) grid.getChildAt(0).requestFocus();
+        } catch (Throwable ignore) {}
         mHandler();
     }
 
@@ -132,13 +143,13 @@ public class MusiHomeActivity extends Activity {
     }
 
     private void mHandler() {
-        Runnable r = new Runnable() {
+        clockRunnable = new Runnable() {
             @Override public void run() {
                 tvDate.setText(new SimpleDateFormat("yyyy年MM月dd日 EEEE  HH:mm", Locale.CHINA).format(new Date()));
                 tvDate.postDelayed(this, 15000);
             }
         };
-        tvDate.post(r);
+        tvDate.post(clockRunnable);
     }
 
     private void addCard(GridLayout grid, String icon, String name, String desc, int color, final Runnable action) {

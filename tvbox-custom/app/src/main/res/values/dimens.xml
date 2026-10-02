@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <dimen name="ts_10">10mm</dimen>
     <dimen name="ts_12">12mm</dimen>
@@ -67,11 +67,10 @@
     <dimen name="vs_420">420mm</dimen>
     <dimen name="vs_440">440mm</dimen>
     <dimen name="vs_460">460mm</dimen>
-    <dimen name="vs_560">560mm</dimen>
     <dimen name="vs_480">480mm</dimen>
     <dimen name="vs_530">530mm</dimen>
     <dimen name="vs_600">600mm</dimen>
     <dimen name="vs_640">640mm</dimen>
     <dimen name="vs_720">720mm</dimen>
     <dimen name="vs_960">960mm</dimen>
-</resources>
+<dimen name="vs_560">560mm</dimen></resources>
