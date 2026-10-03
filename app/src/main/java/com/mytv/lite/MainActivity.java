@@ -56,7 +56,8 @@ public class MainActivity extends Activity {
     private PlayerView playerView;
     private LinearLayout channelPanel;
     private TextView osdText;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private int failCount = 0; // v4.0: 直播连续失败计数
 
     private final List<Channel> channels = new ArrayList<>();
     private final Map<String, List<Integer>> groups = new LinkedHashMap<>();
@@ -236,13 +237,16 @@ public class MainActivity extends Activity {
     }
 
     private void initPlayer() {
+        // v4.0: DefaultDataSource 分发——content://(本地文件)/file:// 走系统数据源，http/https 走代理 OkHttp
         androidx.media3.datasource.HttpDataSource.Factory http = ProxyActivity.httpFactory(this);
+        androidx.media3.datasource.DataSource.Factory dsFactory =
+                new androidx.media3.datasource.DefaultDataSource.Factory(this, http);
         // 流式播放（边下边播，不落盘）：设置较小内存缓冲，验证不依赖下载
         androidx.media3.exoplayer.DefaultLoadControl lc = new androidx.media3.exoplayer.DefaultLoadControl.Builder()
                 .setBufferDurationsMs(4000, 12000, 500, 1500)  // 最小4秒/最大12秒内存缓冲
                 .build();
         player = new ExoPlayer.Builder(this)
-                .setMediaSourceFactory(new DefaultMediaSourceFactory(http))
+                .setMediaSourceFactory(new DefaultMediaSourceFactory(dsFactory))
                 .setLoadControl(lc)
                 .build();
         playerView.setPlayer(player);
@@ -250,12 +254,33 @@ public class MainActivity extends Activity {
         playerView.setResizeMode(androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM);
         player.addListener(new Player.Listener() {
             @Override public void onPlayerError(PlaybackException e) {
-                showOsd("播放失败：" + channels.get(current).name + "\n自动尝试下一个…");
-                handler.removeCallbacks(hideOsd);
-                handler.postDelayed(() -> { current = (current+1) % channels.size(); play(current); }, 2000);
+                // v4.0: 区分直播/点播；直播连续失败一轮即停，不再无限循环；空列表/已退出保护
+                if (channels.isEmpty() || player == null || isFinishing() || isDestroyed()) return;
+                failCount++;
+                if (isLiveMode()) {
+                    if (failCount >= channels.size()) {
+                        failCount = 0;
+                        showOsd("所有频道均播放失败，请检查网络/代理或换源");
+                        return;
+                    }
+                    showOsd("播放失败：" + channels.get(current).name + "\n自动尝试下一个…(" + failCount + "/" + channels.size() + ")");
+                    handler.removeCallbacks(hideOsd);
+                    handler.postDelayed(() -> {
+                        if (player == null || isFinishing() || isDestroyed()) return;
+                        current = (current + 1) % channels.size();
+                        play(current);
+                    }, 2000);
+                } else {
+                    showOsd("播放失败：" + e.getMessage());
+                }
+            }
+            @Override public void onPlaybackStateChanged(int state) {
+                // v4.0: 播起来就清零失败计数
+                if (state == Player.STATE_READY) failCount = 0;
             }
         });
     }
+    private boolean isLiveMode() { return MODE_LIVE.equals(getIntent().getStringExtra(MODE)); }
 
     private void play(int idx) {
         if (channels.isEmpty()) { showOsd("没有可用频道"); return; }
@@ -359,9 +384,8 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_BACK:
                 if (settingsVisible) { settingsVisible = false; settingsPanel.setVisibility(View.GONE); return true; }
                 if (panelVisible) { hidePanelNow(); return true; }
-                // 回到主页
+                // 回到主页（v4.0: 主页在栈底，finish 即回，不再新建实例）
                 if (player != null) player.setPlayWhenReady(false);
-                startActivity(new android.content.Intent(this, HomeActivity.class));
                 finish();
                 return true;
             case KeyEvent.KEYCODE_DPAD_CENTER:
@@ -429,6 +453,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         if (player != null) player.release();
+        if (browser != null) browser.destroyWebView(); // v4.0: 释放 WebView
         super.onDestroy();
     }
 }

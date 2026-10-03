@@ -99,11 +99,22 @@ public class ProxyActivity extends Activity {
     private void doSave() {
         String h = hostIn.getText().toString().trim();
         String p = portIn.getText().toString().trim();
+        int port = 0;
+        // v4.0: 端口校验——字母/越界不再闪退
+        if (!p.isEmpty()) {
+            try {
+                port = Integer.parseInt(p);
+                if (port < 1 || port > 65535) throw new NumberFormatException();
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "端口无效（1~65535）", Toast.LENGTH_LONG).show();
+                return;
+            }
+        }
         getSharedPreferences("mytv", 0).edit()
                 .putString("proxy_host", h)
-                .putInt("proxy_port", p.isEmpty() ? 0 : Integer.parseInt(p))
+                .putInt("proxy_port", port)
                 .apply();
-        Toast.makeText(this, h.isEmpty() ? "代理已关闭" : "代理已设置: " + h + ":" + p, Toast.LENGTH_LONG).show();
+        Toast.makeText(this, h.isEmpty() ? "代理已关闭" : "代理已设置: " + h + ":" + port, Toast.LENGTH_LONG).show();
         finish();
     }
 

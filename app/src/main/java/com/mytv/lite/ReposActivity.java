@@ -70,6 +70,8 @@ public class ReposActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private int focus = 0;
     private List<Site> currentSites = null;
+    private List<Repo> subRepos = null;      // v4.0: 当前多仓的子仓列表（可点进入）
+    private String currentSiteSource = null; // v4.0: 子仓来自哪个多仓（用于返回）
 
     public static void launch(android.content.Context ctx) {
         ctx.startActivity(new android.content.Intent(ctx, ReposActivity.class));
@@ -175,14 +177,26 @@ public class ReposActivity extends Activity {
                 String raw = ReposHttp.get(repo.url);
                 JSONObject cfg = JSONUtil.parse(raw);
                 if (cfg == null) throw new Exception("无法解析为 JSON（可能加密/混淆）");
+                // v4.0: 两种多仓格式都识别成可点击子仓列表（storeHouse / urls）
+                final List<Repo> subs = new ArrayList<>();
                 JSONArray store = cfg.optJSONArray("storeHouse");
-                if (store != null && store.length() > 0) {
-                    StringBuilder sb = new StringBuilder("多仓，含 ").append(store.length()).append(" 个子仓:\n");
-                    for (int i = 0; i < Math.min(store.length(), 20); i++) {
-                        JSONObject s = store.getJSONObject(i);
-                        sb.append("  · ").append(s.optString("sourceName", "?")).append(" → ").append(s.optString("sourceUrl", "")).append("\n");
-                    }
-                    handler.post(() -> status.setText(sb.toString()));
+                if (store != null) for (int i = 0; i < store.length(); i++) {
+                    JSONObject s = store.getJSONObject(i);
+                    subs.add(new Repo(s.optString("sourceName", "?"), s.optString("sourceUrl", "")));
+                }
+                JSONArray urls = cfg.optJSONArray("urls");
+                if (urls != null) for (int i = 0; i < urls.length(); i++) {
+                    JSONObject s = urls.getJSONObject(i);
+                    subs.add(new Repo(s.optString("name", "?"), s.optString("url", "")));
+                }
+                if (urls == null && cfg.has("urls") && cfg.opt("urls") instanceof JSONArray) { /* handled */ }
+                if (!subs.isEmpty()) {
+                    handler.post(() -> {
+                        status.setText("多仓「" + repo.name + "」共 " + subs.size() + " 个子仓 — 点子仓切入");
+                        subRepos = subs;
+                        currentSiteSource = repo.name;
+                        buildSiteRows();
+                    });
                     return;
                 }
                 JSONArray sites = cfg.optJSONArray("sites");
@@ -210,6 +224,26 @@ public class ReposActivity extends Activity {
 
     private void buildSiteRows() {
         while (list.getChildCount() > 1) list.removeViewAt(1);
+        // v4.0: 多仓子仓模式——可点击、可返回仓库列表
+        if (subRepos != null) {
+            for (final Repo r : subRepos) {
+                TextView row = new TextView(this);
+                row.setText("📦 " + r.name);
+                row.setTextColor(0xFFFFB74D); row.setTextSize(15);
+                row.setPadding(dp(32), dp(8), dp(16), dp(8));
+                row.setOnClickListener(v -> loadRepo(r));
+                list.addView(row, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            }
+            TextView back = new TextView(this);
+            back.setText("‹ 返回仓库列表");
+            back.setTextColor(0xFF808090); back.setTextSize(14);
+            back.setPadding(dp(32), dp(12), dp(16), dp(8));
+            back.setOnClickListener(v -> { subRepos = null; status.setText("点仓库名拉取配置"); rebuildList(); });
+            list.addView(back, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            focus = 1;
+            highlight();
+            return;
+        }
         if (currentSites == null) return;
         for (final Site s : currentSites) {
             TextView row = new TextView(this);
@@ -239,6 +273,9 @@ public class ReposActivity extends Activity {
     }
 
     private void highlight() {
+        // v4.0: 焦点钳制防越界
+        if (focus < 0) focus = 0;
+        if (focus > list.getChildCount() - 1) focus = Math.max(0, list.getChildCount() - 1);
         for (int i = 0; i < list.getChildCount(); i++) {
             TextView r = (TextView) list.getChildAt(i);
             if (i == focus) { r.setTextColor(0xFFFFB74D); r.setBackgroundColor(0x33FFFFFF); }
@@ -251,11 +288,17 @@ public class ReposActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         switch (keyCode) {
-            case KeyEvent.KEYCODE_DPAD_UP: focus = Math.max(1, focus - 1); highlight(); return true;
+            case KeyEvent.KEYCODE_DPAD_UP: focus = Math.max(0, focus - 1); highlight(); return true;
             case KeyEvent.KEYCODE_DPAD_DOWN: focus = Math.min(list.getChildCount() - 1, focus + 1); highlight(); return true;
             case KeyEvent.KEYCODE_DPAD_CENTER: case KeyEvent.KEYCODE_ENTER:
-                list.getChildAt(focus).performClick(); return true;
-            case KeyEvent.KEYCODE_BACK: finish(); return true;
+                // v4.0: 空保护
+                android.view.View v = list.getChildAt(focus);
+                if (v != null) v.performClick();
+                return true;
+            case KeyEvent.KEYCODE_BACK:
+                // v4.0: 在子仓列表里返回键先回仓库列表
+                if (subRepos != null) { subRepos = null; status.setText("点仓库名拉取配置"); rebuildList(); return true; }
+                finish(); return true;
         }
         return super.onKeyDown(keyCode, event);
     }

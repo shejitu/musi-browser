@@ -28,12 +28,29 @@ public class LiteServer {
 
     public interface UrlHandler { void onUrl(String url); }
 
-    private final Activity act;
-    private final UrlHandler onUrl;
+    // v4.0: 进程级单例——只绑一次端口，回调恒指向最新主页，避免 Activity 泄漏/端口抢占
+    private static LiteServer instance;
+    private final android.content.Context appCtx; // applicationContext，不持 Activity
+    private volatile Activity act;
+    private UrlHandler onUrl;
     private ServerSocket server;
     private Thread thread;
+    private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
 
-    public LiteServer(Activity act, UrlHandler onUrl) { this.act = act; this.onUrl = onUrl; }
+    public LiteServer(Activity act, UrlHandler onUrl) {
+        this.appCtx = act.getApplicationContext();
+        this.act = act;
+        this.onUrl = onUrl;
+    }
+
+    /** v4.0: HomeActivity 每次都用 ensure() 拿同一实例，重复 start 只更新回调不重启。 */
+    public static LiteServer ensure(Activity act, UrlHandler onUrl) {
+        synchronized (LiteServer.class) {
+            if (instance == null) { instance = new LiteServer(act, onUrl); instance.start(); }
+            else { instance.act = act; instance.onUrl = onUrl; }
+            return instance;
+        }
+    }
 
     public static String localIp(Context ctx) {
         WifiManager wm = (WifiManager) ctx.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
@@ -93,17 +110,24 @@ public class LiteServer {
                     String u = param(path, "url");
                     if (u != null && !u.isEmpty()) {
                         final String fu = u;
-                        act.runOnUiThread(() -> onUrl.onUrl(fu));
+                        main.post(() -> { Activity a = act; if (a != null && !a.isFinishing()) onUrl.onUrl(fu); });
                         respond(s, 200, "ok: 电视端正在打开 " + u);
                     } else respond(s, 400, "missing url");
                 } else if (path.startsWith("/setproxy?")) {
                     String h = param(path, "host"), p = param(path, "port");
                     if (h != null && p != null) {
-                        final String fh = h; final int fp = Integer.parseInt(p);
-                        act.runOnUiThread(() -> {
-                            act.getSharedPreferences("mytv", 0).edit()
-                               .putString("proxy_host", fh).putInt("proxy_port", fp).apply();
-                            android.widget.Toast.makeText(act, "代理已设置: " + fh + ":" + fp, android.widget.Toast.LENGTH_LONG).show();
+                        final String fh = h;
+                        // v4.0: 端口校验，非法返回 400 不再静默
+                        int fp = 0;
+                        boolean ok = true;
+                        try { fp = Integer.parseInt(p); if (fp < 1 || fp > 65535) ok = false; } catch (NumberFormatException e) { ok = false; }
+                        if (!ok) { respond(s, 400, "端口无效（1~65535）"); return; }
+                        final int fpp = fp;
+                        main.post(() -> {
+                            appCtx.getSharedPreferences("mytv", 0).edit()
+                               .putString("proxy_host", fh).putInt("proxy_port", fpp).apply();
+                            Activity a = act;
+                            android.widget.Toast.makeText(a != null ? a : appCtx, "代理已设置: " + fh + ":" + fpp, android.widget.Toast.LENGTH_LONG).show();
                         });
                         respond(s, 200, "ok: 电视端代理已设置为 " + h + ":" + p);
                     } else respond(s, 400, "missing host/port");
@@ -125,22 +149,39 @@ public class LiteServer {
     private void saveUpload(InputStream in, int contentLen, String contentType) throws IOException {
         File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "download");
         if (!dir.exists() && !dir.mkdirs()) {
-            File alt = new File(act.getExternalFilesDir(null), "download");
+            File alt = new File(appCtx.getExternalFilesDir(null), "download");
             alt.mkdirs();
             dir = alt;
         }
-        // 读取整个请求体（推视频文件可能较大，按 32MB 上限保护）
-        java.io.ByteArrayOutputStream body = new java.io.ByteArrayOutputStream();
+        // v4.0: 流式落盘（内存占用恒定），2GB 上限；头部先小缓冲解析
+        final int MAX = 2 * 1024 * 1024 * 1024;
         byte[] buf = new byte[65536];
-        int total = 0;
-        while (total < contentLen) {
-            int n = in.read(buf, 0, Math.min(buf.length, contentLen - total));
-            if (n < 0) break;
-            body.write(buf, 0, n);
-            total += n;
-        }
-        byte[] data = body.toByteArray();
-        String head = new String(data, 0, Math.min(data.length, 8192), StandardCharsets.ISO_8859_1);
+        java.io.ByteArrayOutputStream headBuf = new java.io.ByteArrayOutputStream();
+        int total = 0, headEnd = -1;
+        File tmp = new File(dir, ".upload_tmp");
+        FileOutputStream fo = new FileOutputStream(tmp);
+        try {
+            while (total < contentLen) {
+                int n = in.read(buf, 0, Math.min(buf.length, contentLen - total));
+                if (n < 0) break;
+                total += n;
+                if (headEnd < 0) {
+                    headBuf.write(buf, 0, n);
+                    byte[] hb = headBuf.toByteArray();
+                    for (int i = 0; i <= hb.length - 4; i++) {
+                        if (hb[i] == 13 && hb[i+1] == 10 && hb[i+2] == 13 && hb[i+3] == 10) { headEnd = i + 4; break; }
+                    }
+                    if (headEnd >= 0) {
+                        int bodyInBuf = hb.length - headEnd;
+                        fo.write(hb, headEnd, bodyInBuf);
+                    }
+                } else {
+                    fo.write(buf, 0, n);
+                    if (total > MAX) throw new IOException("文件超过 2GB 上限");
+                }
+            }
+        } finally { fo.close(); }
+        String head = new String(headBuf.toByteArray(), 0, Math.min(headBuf.size(), 8192), StandardCharsets.ISO_8859_1);
         String filename = "upload_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         int fn = head.indexOf("filename=\"");
         if (fn >= 0) {
@@ -148,34 +189,47 @@ public class LiteServer {
             String raw = head.substring(fn + 10, fe);
             if (!raw.isEmpty()) filename = new String(raw.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
         }
-        // 正文起点：第一个 \r\n\r\n（头部结束）之后
-        int sep = -1;
-        for (int i = 0; i < data.length - 3; i++) {
-            if (data[i] == 13 && data[i+1] == 10 && data[i+2] == 13 && data[i+3] == 10) { sep = i; break; }
-        }
-        if (sep < 0) throw new IOException("bad multipart");
-        int bodyStart = sep + 4;
-        // 去掉末尾 multipart boundary：boundary 在 HTTP 请求头的 Content-Type 里
-        int bodyEnd = data.length;
+        if (headEnd < 0) { tmp.delete(); throw new IOException("bad multipart"); }
+        // v4.0: 尾部 boundary 裁剪——RandomAccessFile 从文件尾回查，不依赖全量内存
+        long bodyEnd = tmp.length();
         if (contentType != null) {
             int bLine = contentType.indexOf("boundary=");
             if (bLine >= 0) {
                 String boundary = contentType.substring(bLine + 9).split("\"|\\s|;")[0];
                 byte[] tail = ("\r\n--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
-                int scanFrom = Math.max(bodyStart, data.length - tail.length - 256);
-                outer:
-                for (int i = data.length - tail.length; i >= scanFrom; i--) {
-                    for (int j = 0; j < tail.length; j++) {
-                        if (data[i + j] != tail[j]) continue outer;
+                try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(tmp, "r")) {
+                    long scanFrom = Math.max(0, raf.length() - tail.length - 256);
+                    outer:
+                    for (long i = raf.length() - tail.length; i >= scanFrom; i--) {
+                        raf.seek(i);
+                        for (int j = 0; j < tail.length; j++) {
+                            if (raf.read() != tail[j]) continue outer;
+                        }
+                        bodyEnd = i;
+                        break;
                     }
-                    bodyEnd = i;
-                    break;
                 }
             }
         }
-        FileOutputStream fo = new FileOutputStream(new File(dir, sanitize(filename)));
-        fo.write(data, bodyStart, bodyEnd - bodyStart);
-        fo.close();
+        // 同名自动加序号不覆盖
+        File out = new File(dir, sanitize(filename));
+        if (out.exists()) {
+            int dot = filename.lastIndexOf('.');
+            String base = dot > 0 ? filename.substring(0, dot) : filename;
+            String ext = dot > 0 ? filename.substring(dot) : "";
+            for (int k = 1; out.exists(); k++) out = new File(dir, sanitize(base + "_" + k + ext));
+        }
+        try (java.io.RandomAccessFile src = new java.io.RandomAccessFile(tmp, "r");
+             FileOutputStream dst = new FileOutputStream(out)) {
+            long remain = bodyEnd;
+            while (remain > 0) {
+                int n = src.read(buf, 0, (int) Math.min(buf.length, remain));
+                if (n < 0) break;
+                dst.write(buf, 0, n);
+                remain -= n;
+            }
+        }
+        tmp.delete();
     }
 
     private String sanitize(String f) {

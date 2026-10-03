@@ -100,8 +100,10 @@ public class BrowserView extends FrameLayout {
             @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest r) { return false; }
             @Override public android.webkit.WebResourceResponse shouldInterceptRequest(WebView v, android.webkit.WebResourceRequest r) {
                 String u = r.getUrl().toString().toLowerCase();
+                // v4.0: 剥掉 query/fragment 再按路径 endsWith 判定，poster.mp4.jpg 不再误报
+                String path = u.split("[?#]")[0];
                 for (String ext : VIDEO_EXT) {
-                    if (u.contains(ext)) {
+                    if (path.endsWith(ext) || (u.contains("?" + ext.substring(1) + "=")) || u.contains("&" + ext.substring(1) + "=")) {
                         if (!u.equals(pendingVideoUrl == null ? "" : pendingVideoUrl.toLowerCase())) {
                             pendingVideoUrl = r.getUrl().toString();
                             pendingVideoTitle = v.getTitle();
@@ -118,6 +120,16 @@ public class BrowserView extends FrameLayout {
             }
         });
         root.addView(web, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+    }
+
+    /** v4.0: 释放 WebView（stopLoading → about:blank → destroy），onDestroy 调用防泄漏。 */
+    public void destroyWebView() {
+        if (web != null) {
+            web.stopLoading();
+            web.loadUrl("about:blank");
+            web.destroy();
+            web = null;
+        }
     }
 
     private void playPending() {

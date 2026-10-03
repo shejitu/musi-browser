@@ -67,14 +67,8 @@ public class Sources {
             r.close();
             return sb.toString();
         }
-        HttpURLConnection c = (HttpURLConnection) new URL(s.url).openConnection();
-        c.setConnectTimeout(10000); c.setReadTimeout(15000);
-        c.setRequestProperty("User-Agent", "Mozilla/5.0 MyTV/1.0");
-        BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
-        StringBuilder sb = new StringBuilder(); String line;
-        while ((line = r.readLine()) != null) sb.append(line).append('\n');
-        r.close(); c.disconnect();
-        return sb.toString();
+        // v4.0: 远程/自定义订阅走代理感知拉取
+        return ReposHttp.get(s.url, ctx);
     }
 
     /** 设置面板：列出内置源 + 自定义订阅入口。 */
@@ -97,7 +91,8 @@ public class Sources {
         for (final Source s : builtins()) {
             String key = s.asset;
             Button b = new Button(act);
-            b.setText(("iptv_cn.m3u".equals(active) ? "● " : "○ ") + s.name);
+            // v4.0: 用各源自己的 key 判定选中，不再写死 iptv_cn.m3u
+            b.setText((key.equals(active) ? "● " : "○ ") + s.name);
             b.setTextSize(15);
             b.setOnClickListener(v -> { setActive(act, key); cb.onSourcePicked(); });
             box.addView(b);

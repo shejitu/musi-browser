@@ -59,6 +59,8 @@ public class ChannelActivity extends Activity {
     }
 
     private void scanNext(final List<ReposActivity.Repo> repos, final int idx) {
+        // v4.0: 页面已退出则不再继续跳转
+        if (isFinishing() || isDestroyed()) return;
         if (idx >= repos.size()) {
             status.setText("所有仓库都没有可用的 CMS 海报墙源。请到「仓库管理」手动添加 CMS 接口地址\n（格式如 http://xxx/api.php?ac=videolist 或 http://xxx/api.php/provide/vod/）");
             return;
@@ -87,10 +89,9 @@ public class ChannelActivity extends Activity {
                         }
                     }
                 }
-                handler.post(() -> addSkipRow(r.name, "无直链源"));
-                scanNext(repos, idx + 1);
+                handler.post(() -> { if (isFinishing() || isDestroyed()) return; addSkipRow(r.name, "无直链源"); scanNext(repos, idx + 1); });
             } catch (Exception e) {
-                handler.post(() -> { addSkipRow(r.name, e.getMessage()); scanNext(repos, idx + 1); });
+                handler.post(() -> { if (isFinishing() || isDestroyed()) return; addSkipRow(r.name, e.getMessage()); scanNext(repos, idx + 1); });
             }
         }).start();
     }

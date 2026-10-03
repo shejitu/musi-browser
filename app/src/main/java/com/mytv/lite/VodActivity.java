@@ -97,6 +97,10 @@ public class VodActivity extends Activity {
         searchText.setPadding(dp(24), dp(6), dp(24), dp(6));
         searchText.setBackgroundColor(0xFF00C4D4);
         searchText.setOnClickListener(v -> showSearchDialog());
+        searchText.setFocusable(true);
+        searchText.setFocusableInTouchMode(true);
+        searchText.setClickable(true);
+        searchText.setOnFocusChangeListener((vv, f) -> searchText.setBackgroundColor(f ? 0xFFFF8C42 : 0xFF00C4D4));
         row1.addView(searchText);
 
         navRow = new LinearLayout(this);
@@ -133,11 +137,17 @@ public class VodActivity extends Activity {
     }
 
     private void load(final int pg, final int cat) {
+        page = pg; // v4.0: 同步页码，否则左右键翻页用旧页码
         status.setText("加载中… 第" + pg + "页");
         new Thread(() -> {
             try {
                 String url = apiBase + (apiBase.contains("?") ? "&" : "?") + "pg=" + pg;
-                if (cat >= 0 && cat < categories.size()) url += "&t=" + URLEncoder.encode(categories.get(cat), "UTF-8");
+                if (cat >= 0 && cat < categories.size()) {
+                    // v4.0: categories 现存 "id|name"，传苹果CMS要的 type_id 而非名字
+                    String cn = categories.get(cat);
+                    int bar = cn.indexOf('|');
+                    url += "&t=" + URLEncoder.encode(bar >= 0 ? cn.substring(0, bar) : cn, "UTF-8");
+                }
                 JSONObject d = JSONUtil.parse(ReposHttp.get(url));
                 JSONArray list = d == null ? null : d.optJSONArray("list");
                 if (list == null) throw new Exception("接口返回无 list 字段，不是苹果CMS协议");
@@ -145,7 +155,7 @@ public class VodActivity extends Activity {
                 JSONArray cls = d.optJSONArray("class");
                 final List<String> cats = new ArrayList<>();
                 if (cls != null) for (int i = 0; i < cls.length(); i++)
-                    cats.add(cls.getJSONObject(i).optString("type_name"));
+                    cats.add(cls.getJSONObject(i).optString("type_id", "") + "|" + cls.getJSONObject(i).optString("type_name"));
 
                 final List<Video> vids = new ArrayList<>();
                 for (int i = 0; i < list.length(); i++) {
@@ -197,6 +207,11 @@ public class VodActivity extends Activity {
         t.setTextSize(14);
         t.setPadding(dp(14), dp(6), dp(14), dp(6));
         t.setOnClickListener(v -> { currentCategory = idx; page = 1; categories.clear(); buildNav(); load(1, idx); });
+        t.setFocusable(true);
+        t.setFocusableInTouchMode(true);
+        t.setClickable(true);
+        // 焦点高亮（v4.0：遥控器可选中分类导航）
+        t.setOnFocusChangeListener((vv, f) -> t.setTextColor(f ? 0xFFFFFFFF : (idx == currentCategory ? 0xFFE42112 : 0xFFB0B0C0)));
         navRow.addView(t);
     }
 
@@ -232,6 +247,11 @@ public class VodActivity extends Activity {
             card.addView(nm, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
             card.setOnClickListener(vv -> showDetail(v));
+            // v4.0: 遥控器焦点支持——海报卡片可选中 + 高亮
+            card.setFocusable(true);
+            card.setFocusableInTouchMode(true);
+            card.setClickable(true);
+            card.setOnFocusChangeListener((vv, f) -> card.setBackgroundColor(f ? 0xFF4FC3F7 : 0x00000000));
             row.addView(card);
             loadImage(img, v.pic);
         }
@@ -259,6 +279,10 @@ public class VodActivity extends Activity {
         close.setTextColor(0xFF808090);
         detailPanel.addView(close, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         close.setOnClickListener(vv -> detailPanel.setVisibility(android.view.View.GONE));
+        close.setFocusable(true);
+        close.setFocusableInTouchMode(true);
+        close.setClickable(true);
+        close.setOnFocusChangeListener((vv, f) -> close.setTextColor(f ? 0xFFFFFFFF : 0xFF808090));
 
         TextView name = new TextView(this);
         name.setText(v.name);
@@ -293,15 +317,21 @@ public class VodActivity extends Activity {
                 if (list != null && list.length() > 0) {
                     JSONObject o = list.getJSONObject(0);
                     final String blurb = o.optString("vod_content", "暂无简介").replaceAll("<[^>]+>", "").trim();
-                    JSONArray plays = o.optJSONArray("vod_play_url");
+                    // 苹果CMS vod_play_url 兼容两种形态：字符串"第1集$http://…#第2集$http://…"（多源$$$分隔）或字符串数组
                     final List<String[]> eps = new ArrayList<>();
-                    if (plays != null) {
-                        for (int p = 0; p < plays.length(); p++) {
-                            for (String seg : plays.getString(p).split("#")) {
-                                int dollar = seg.indexOf('$');
-                                if (dollar > 0) eps.add(new String[]{seg.substring(0, dollar), seg.substring(dollar + 1)});
-                                else if (!seg.trim().isEmpty()) eps.add(new String[]{"第" + (eps.size()+1) + "集", seg});
-                            }
+                    Object pu = o.has("vod_play_url") ? o.get("vod_play_url") : null;
+                    List<String> playSources = new ArrayList<>();
+                    if (pu instanceof JSONArray) {
+                        JSONArray ja = (JSONArray) pu;
+                        for (int p = 0; p < ja.length(); p++) playSources.add(ja.optString(p, ""));
+                    } else if (pu instanceof String) {
+                        for (String src : ((String) pu).split("\\$\\$\\$")) playSources.add(src);
+                    }
+                    for (String src : playSources) {
+                        for (String seg : src.split("#")) {
+                            int dollar = seg.indexOf('$');
+                            if (dollar > 0) eps.add(new String[]{seg.substring(0, dollar), seg.substring(dollar + 1)});
+                            else if (!seg.trim().isEmpty()) eps.add(new String[]{"第" + (eps.size()+1) + "集", seg});
                         }
                     }
                     handler.post(() -> {
@@ -335,6 +365,11 @@ public class VodActivity extends Activity {
                                 it.putExtra("play_title", v.name + " " + epName);
                                 startActivity(it);
                             });
+                            // v4.0: 选集按钮遥控器焦点支持
+                            ep.setFocusable(true);
+                            ep.setFocusableInTouchMode(true);
+                            ep.setClickable(true);
+                            ep.setOnFocusChangeListener((vv, f) -> ep.setBackgroundColor(f ? 0xFF4FC3F7 : 0xFF2A2A3C));
                             epRow.addView(ep);
                         }
                     });
@@ -387,7 +422,9 @@ public class VodActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (detailPanel.getVisibility() == android.view.View.VISIBLE) {
+            // v4.0: 详情打开时左右键交给面板内焦点移动，不再翻背后列表
             if (keyCode == KeyEvent.KEYCODE_BACK) { detailPanel.setVisibility(android.view.View.GONE); return true; }
+            if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT || keyCode == KeyEvent.KEYCODE_DPAD_RIGHT) return true;
         } else if (keyCode == KeyEvent.KEYCODE_BACK) { finish(); return true; }
         switch (keyCode) {
             case KeyEvent.KEYCODE_DPAD_LEFT:

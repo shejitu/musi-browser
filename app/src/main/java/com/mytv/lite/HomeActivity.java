@@ -185,13 +185,13 @@ public class HomeActivity extends Activity {
     }
 
     private void startServer() {
-        LiteServer server = new LiteServer(this, url -> {
+        // v4.0: 单例 ensure()——只绑一次端口，旧实例不泄漏
+        LiteServer.ensure(this, url -> {
             // 从电脑推送：直接进浏览器打开
             android.content.Intent it = new android.content.Intent(this, MainActivity.class);
             it.putExtra("browser_url", url);
             startActivity(it);
         });
-        server.start();
     }
 
     @Override
