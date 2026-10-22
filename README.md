@@ -1,3 +1,5 @@
+> 📺 新增：[ITERATION_GUIDE.md](ITERATION_GUIDE.md) — 慕思影视 2.x 逆向分析与迭代指导书（AI 协作必读）
+
 # 慕思浏览器 (musi-browser)
 
 Android TV 电视应用：**主菜单首页 + 电视直播 + TVBox仓库影视点播（海报墙）+ 网页浏览/视频嗅探 + 本地文件 + 局域网控制台 + Clash代理**。无注册、无登录、无广告、无加固，纯净自用。
