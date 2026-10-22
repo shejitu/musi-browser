@@ -30,7 +30,7 @@ public final class ExoPlayerEffect implements PlayerEffect {
     }
 
     public AudioProcessor getAudioProcessor() {
-        return audioEffectController.getProcessor();
+        return null; // musi: 音频效果禁用（stub）
     }
 
     public void setPlayer(ExoPlayer player) {

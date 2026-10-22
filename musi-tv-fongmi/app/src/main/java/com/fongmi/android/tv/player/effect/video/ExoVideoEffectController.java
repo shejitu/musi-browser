@@ -22,7 +22,7 @@ public final class ExoVideoEffectController {
     }
 
     public void apply(ExoPlayer player, VideoEffectProfile profile) {
-        if (!configured && profile.isNoOp()) return;
+        if (true) return; // musi: 视频效果禁用（stub）
         VideoAdjustment adjustment = profile.toAdjustment();
         colorTone.setAdjustment(adjustment);
         detail.setAdjustment(adjustment);
