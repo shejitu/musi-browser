@@ -172,7 +172,16 @@ public class Result implements Parcelable {
     }
 
     public List<Class> getTypes() {
-        return types == null ? Collections.emptyList() : types;
+        if (types == null) return Collections.emptyList();
+        List<Class> visible = new java.util.ArrayList<>();
+        for (Class t : types) if (t.getTypeName() != null && isBlockedCategory(t.getTypeName())) continue; else visible.add(t);
+        return visible;
+    }
+
+    private static boolean isBlockedCategory(String name) {
+        String[] blocked = {"伦理", "短剧"};
+        for (String b : blocked) if (name.contains(b)) return true;
+        return false;
     }
 
     public void setTypes(List<Class> types) {
@@ -180,7 +189,10 @@ public class Result implements Parcelable {
     }
 
     public List<Vod> getList() {
-        return list == null ? Collections.emptyList() : list;
+        if (list == null) return Collections.emptyList();
+        List<Vod> visible = new java.util.ArrayList<>();
+        for (Vod v : list) if (v.getName() != null && (v.getName().contains("短剧") || v.getName().contains("伦理"))) continue; else visible.add(v);
+        return visible;
     }
 
     public void setList(List<Vod> list) {
