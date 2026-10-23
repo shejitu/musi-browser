@@ -26,14 +26,14 @@ public class SitesPanel {
 
     private static List<Site> cached;
 
-    /** 读取站点：优先云端 musitv_sites.json（改源不重装），否则 assets/site_config.json，失败回退内置。 */
+    /** 读取站点：优先云端 site_config.json（改源不重装），否则 assets，失败回退内置。 */
     public static List<Site> loadSites(Activity act) {
         if (cached != null) return cached;
         List<Site> out = new ArrayList<>();
-        // 1) 云端
+        // 1) 云端（与 assets 同格式，v4.1 起用它替代已删除的 musitv_sites.json）
         try {
-            String s = ReposHttp.get("https://raw.githubusercontent.com/shejitu/musi-browser/master/musitv_sites.json", act);
-            parseJson(out, s, false);
+            String s = ReposHttp.get("https://raw.githubusercontent.com/shejitu/musi-browser/master/app/src/main/assets/site_config.json", act);
+            parseJson(out, s, true);
         } catch (Throwable ignore) { }
         // 2) assets
         if (out.isEmpty()) {

@@ -258,4 +258,3 @@ app/src/main/assets/
 .github/workflows/build.yml
 ```
 
-<!-- build trigger -->
