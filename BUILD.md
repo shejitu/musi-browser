@@ -1,78 +1,64 @@
-# 编译说明
+# 构建与发布
 
-## 环境要求
+## 环境
 
-| 组件 | 版本 | 说明 |
-|---|---|---|
-| JDK | 17 | `sudo apt install openjdk-17-jdk-headless` |
-| Android SDK | Platform 34 + Build-Tools 34.0.0 | 通过 cmdline-tools 安装 |
-| Gradle | 8.5 | [下载地址](https://services.gradle.org/distributions/gradle-8.5-bin.zip) |
+| 项 | 版本 |
+|---|---|
+| JDK | 17 |
+| Gradle | 8.5 |
+| AGP | 8.2.2 |
+| compileSdk | 34 |
+| build-tools | 34.0.0 |
 
-## 1. 安装 Android SDK
+## 云端（推荐）
 
-```bash
-mkdir -p ~/android-sdk/cmdline-tools && cd /tmp
-curl -sL -o cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-unzip -q cmdtools.zip -d ~/android-sdk/cmdline-tools
-mv ~/android-sdk/cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
+push 到 `master` 即触发 `.github/workflows/build.yml`：
 
-export ANDROID_HOME=~/android-sdk
-yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --sdk_root=$ANDROID_HOME \
-    "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-```
+1. JDK 17 + `android-actions/setup-android` + `sdkmanager` 安装 platform-34 / build-tools 34
+2. `gradle assembleRelease`
+3. 用 `app/mytv.jks` 签名，产物 `MusiBrowser-v4.1.apk`
+4. 上传 artifact `musi-apk`，同时强推 `apk` 分支（无 artifact 通道时按二进制取回）
 
-## 2. 安装 Gradle
+> `apk` 分支是构建产物分支，会被每次构建 `-f` 覆盖，不要在上面改代码。
 
-```bash
-cd /tmp
-curl -sL -o gradle.zip https://services.gradle.org/distributions/gradle-8.5-bin.zip
-sudo unzip -q gradle.zip -d /opt
-/opt/gradle-8.5/bin/gradle --version   # 应显示 JVM: 17.x
-```
-
-## 3. 生成签名密钥（首次编译前）
+## 本地
 
 ```bash
-keytool -genkeypair -v -keystore app/mytv.jks -alias mytv \
-    -keyalg RSA -keysize 2048 -validity 10000 \
-    -storepass mytv2026 -keypass mytv2026 \
-    -dname "CN=MyTV,O=Personal,C=CN"
+gradle assembleRelease
+ls app/build/outputs/apk/release/
 ```
 
-> 仓库里已带一个自用密钥 `app/mytv.jks`（密码同为 mytv2026）。**仅供自用调试**；如要正式分发，请重新生成自己的密钥并更换密码。
+首次构建需要联网拉 AGP 与 AndroidX 依赖（media3 1.3.1、webkit 1.8.0、okhttp 4.12.0）。
 
-## 4. 编译
+## 签名
 
-```bash
-export ANDROID_HOME=~/android-sdk
-cd xpglite
-/opt/gradle-8.5/bin/gradle assembleRelease --no-daemon
+```gradle
+signingConfigs {
+    release {
+        storeFile file("mytv.jks")
+        storePassword "mytv2026"
+        keyAlias "mytv"
+        keyPassword "mytv2026"
+    }
+}
 ```
 
-产物：`app/build/outputs/apk/release/app-release.apk`
+- **不要换 key**：换了之后新包无法覆盖旧版，必须卸载重装（本地设置会丢）。
+- 当前 jks 与密码在公开仓库里，任何人可签同签名包。要收紧：把 jks base64 存 GitHub Secrets，
+  CI 里还原到 `app/mytv.jks`，然后 `git rm --cached app/mytv.jks` 并从仓库删除。
+  代价是新旧包签名不同，用户需卸载重装一次。
 
-## 5. 验证（可选）
+## 版本号
 
-```bash
-~/android-sdk/build-tools/34.0.0/aapt dump badging \
-    app/build/outputs/apk/release/app-release.apk | head -3
-```
+- `versionName`：`4.1` 形式，功能变更 +0.1
+- `versionCode`：`41` 形式（×10 + 小版本），**只增不减**
+- 新包文件名带版本：`MusiBrowser-v4.1.apk`，不要覆盖旧版本文件
 
-应看到 `package: name='com.mytv.lite' ... application-label:'慕思浏览器'`
+## 自检清单（发布前）
 
-## 常见问题
-
-**Q: mergeReleaseResources 报 Duplicate resources**
-同一资源名同时存在 .xml 和 .png。检查 `res/drawable/banner.*` 只保留一个。
-
-**Q: shouldInterceptRequest 报错**
-该方法的返回类型是 `WebResourceResponse`（不是 boolean），返回 `null` 表示不拦截。
-
-**Q: 电视上安装失败（解析包错误）**
-确认电视是 armeabi-v7a 或以上（本 APK 未限定 ABI，通用）；Android 版本 ≥ 5.0。
-
-## 添加新功能后的发布流程
-
-1. 改 `app/build.gradle` 里的 `versionCode`（+1）和 `versionName`
-2. 重新 `gradle assembleRelease`
-3. 拷贝 `app-release.apk` 改名带上版本号
+1. 主页 7 张卡片都能进；
+2. 直播能出画面，▲▼ 换台正常；
+3. 浏览器打开一个影视站 → 按菜单键 → 轻站面板出现海报/选集；
+4. 点一集能播，返回键回面板，再返回退出；
+5. 设置 → 轻站规则管理 → 拉取官方规则成功；
+6. 局域网 `http://电视IP:8080` 推送网址可用。

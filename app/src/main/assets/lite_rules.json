@@ -1,0 +1,54 @@
+{
+  "version": 2,
+  "note": "慕思浏览器 轻站规则。hosts 按域名后缀匹配（取最长命中）；selector 命中选集链接；可选 js 字段为函数体，需 return {title,poster,items:[{name,url}],media:[...]}。selector 抓不到时会自动回退通用嗅探，所以写错不会导致不可用。",
+  "rules": [
+    {
+      "id": "wuguiyy",
+      "name": "乌龟影院",
+      "hosts": ["wuguiyy.com"],
+      "selector": "a[href*='/vodplay/'], .playlist a, .stui-content__playlist a"
+    },
+    {
+      "id": "siguyy",
+      "name": "思古影视",
+      "hosts": ["siguyy.com"],
+      "selector": "a[href*='/vodplay/'], .playlist a, .stui-content__playlist a"
+    },
+    {
+      "id": "cokemv",
+      "name": "酷壳影视",
+      "hosts": ["cokemv.me", "cokemv.com"],
+      "selector": "a[href*='/vodplay/'], .playlist a, .module-play-list a"
+    },
+    {
+      "id": "lezhutv",
+      "name": "乐猪影视",
+      "hosts": ["lezhutv.com"],
+      "selector": "a[href*='/vodplay/'], .playlist a, .stui-content__playlist a"
+    },
+    {
+      "id": "auete",
+      "name": "阿里影视",
+      "hosts": ["auete.com"],
+      "selector": "a[href*='/vodplay/'], a[href*='/play/'], .playlist a"
+    },
+    {
+      "id": "ququmc",
+      "name": "扛把子影院",
+      "hosts": ["ququmc.com"],
+      "selector": "a[href*='/vodplay/'], .playlist a, .stui-content__playlist a"
+    },
+    {
+      "id": "bilibili",
+      "name": "B站",
+      "hosts": ["bilibili.com"],
+      "selector": ".video-pod__item a, .list-item a"
+    },
+    {
+      "id": "cctv-live",
+      "name": "央视直播",
+      "hosts": ["cctv.com", "tv.cctv.com"],
+      "selector": ".channel-item a, .column-list a"
+    }
+  ]
+}

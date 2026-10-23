@@ -46,6 +46,12 @@
             android:screenOrientation="landscape" />
         <activity android:name=".ChannelActivity" android:exported="false"
             android:screenOrientation="landscape" />
+        <!-- v4.1 轻站：网页一键转 TV 界面 -->
+        <activity android:name=".LiteActivity" android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+        <activity android:name=".LiteRulesActivity" android:exported="false"
+            android:screenOrientation="landscape" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.mytv.lite.files"

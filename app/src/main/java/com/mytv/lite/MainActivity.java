@@ -160,6 +160,9 @@ public class MainActivity extends Activity {
                 player.prepare();
                 player.setPlayWhenReady(true);
                 showOsd("▶ 点播: " + title);
+            }, (url, title, probe) -> {
+                // v4.1 轻站：把当前页的探测结果交给 TV 化面板
+                LiteActivity.launch(MainActivity.this, url, title, probe);
             });
             ((FrameLayout) findViewById(android.R.id.content)).addView(browser,
                     new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -359,6 +362,12 @@ public class MainActivity extends Activity {
                 if (browser.handleBack()) return true;
                 // 无页可退：回主页（finish 本页，Home 在栈底自然显示）
                 finish();
+                return true;
+            }
+            // 菜单键 / 遥控器颜色键：一键轻站
+            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
+                    || keyCode == KeyEvent.KEYCODE_BUTTON_Y) {
+                browser.runLite();
                 return true;
             }
             return super.onKeyDown(keyCode, event);

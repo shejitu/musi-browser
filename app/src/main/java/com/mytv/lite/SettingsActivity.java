@@ -7,6 +7,7 @@ import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -50,6 +51,20 @@ public class SettingsActivity extends Activity {
 
     private void rebuild() {
         panelHost.removeAllViews();
+        // v4.1: 轻站规则入口
+        Button lite = new Button(this);
+        lite.setText("⚡ 轻站规则管理（导入/更新站点规则，改版不用重装）");
+        lite.setTextSize(14);
+        lite.setAllCaps(false);
+        lite.setTextColor(Color.WHITE);
+        lite.setBackgroundColor(0xFF2B2B3D);
+        lite.setFocusable(true);
+        lite.setOnClickListener(v -> LiteRulesActivity.launch(this));
+        lite.setOnFocusChangeListener((v, has) -> lite.setBackgroundColor(has ? 0xFF4FC3F7 : 0xFF2B2B3D));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.setMargins(0, 0, 0, dp(12));
+        panelHost.addView(lite, lp);
         panelHost.addView(Sources.buildPanel(this, this::rebuild));
     }
 

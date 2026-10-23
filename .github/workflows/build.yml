@@ -1,0 +1,66 @@
+name: build
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 platform 34 / build-tools 34
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+
+      - name: Gradle 8.5
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.5'
+
+      - name: assembleRelease
+        run: gradle assembleRelease --no-daemon --stacktrace
+
+      - name: 收集 APK 并核对签名
+        run: |
+          set -e
+          mkdir -p out
+          SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          echo "built: $SRC"
+          cp "$SRC" out/MusiBrowser-v4.1.apk
+          ls -la out
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
+          "$APKSIGNER" verify --print-certs out/MusiBrowser-v4.1.apk || true
+
+      - name: 上传 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: musi-apk
+          path: out/*.apk
+
+      # 无 artifact 通道时的取回路径：把 APK 推到 apk 分支
+      - name: 推送 apk 分支
+        run: |
+          set -e
+          cd out
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          git checkout -q -b apk
+          git add -A
+          git commit -qm "apk v4.1 (run ${GITHUB_RUN_NUMBER})"
+          git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" apk

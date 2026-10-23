@@ -92,7 +92,7 @@ public class SitesPanel {
         box.setBackgroundColor(0xF2101010);
 
         TextView title = new TextView(act);
-        title.setText("影视站点 — 选择后进入浏览，页面里发现视频流即可点播");
+        title.setText("影视站点 — 进入后点【⚡轻站】或按菜单键，一键转 TV 界面");
         title.setTextColor(0xFF4FC3F7); title.setTextSize(16);
         title.setPadding(0, 0, 0, 24);
         box.addView(title);

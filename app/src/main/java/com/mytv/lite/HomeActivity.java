@@ -100,7 +100,7 @@ public class HomeActivity extends Activity {
         addCard("📚", "仓库管理", "TVBox 单仓/多仓 · 拉取配置", 0xFF3A1F33, new Launcher() {
             @Override public void launch() { ReposActivity.launch(HomeActivity.this); }
         });
-        addCard("🎬", "影视点播", "YouTube/B站/影视站 · 嗅探点播", 0xFF3D2B1F, new Launcher() {
+        addCard("🎬", "影视点播", "网页嗅探 · ⚡轻站转TV", 0xFF3D2B1F, new Launcher() {
             @Override public void launch() { MainActivity.launchBrowser(HomeActivity.this); }
         });
         addCard("📺", "影视频道", "仓库推荐影视 · 海报墙", 0xFF2B1F3D, new Launcher() {
@@ -118,7 +118,7 @@ public class HomeActivity extends Activity {
 
         // ===== 底部提示 =====
         TextView tip = new TextView(this);
-        tip.setText("◀ ▶ 选择   OK 确认   局域网控制: http://" + LiteServer.localIp(this) + ":8080");
+        tip.setText("◀ ▶ 选择   OK 确认   ⚡轻站：浏览网页时一键转 TV 界面   局域网控制: http://" + LiteServer.localIp(this) + ":8080");
         tip.setTextColor(0xFF606070);
         tip.setTextSize(13);
         tip.setPadding(0, dp(40), 0, 0);
