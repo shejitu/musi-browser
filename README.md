@@ -257,3 +257,5 @@ app/src/main/assets/
   iptv_*.m3u        内置直播源
 .github/workflows/build.yml
 ```
+
+<!-- build trigger -->
