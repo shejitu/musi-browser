@@ -19,13 +19,23 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 安装 platform 34 / build-tools 34
+      - name: Android SDK 检查/补齐
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null
+          set -e
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          ls "$SDK/platforms" 2>/dev/null || true
+          if [ ! -d "$SDK/platforms/android-34" ]; then
+            SDKM=$(ls "$SDK"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | tail -1 || true)
+            echo "sdkmanager=$SDKM"
+            if [ -n "$SDKM" ]; then
+              yes | "$SDKM" --licenses > /dev/null 2>&1 || true
+              "$SDKM" "platforms;android-34" "build-tools;34.0.0" || true
+            fi
+          fi
+          ls "$SDK/platforms"
 
       - name: Gradle 8.5
         uses: gradle/actions/setup-gradle@v3
