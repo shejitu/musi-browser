@@ -89,6 +89,7 @@ public class LiteActivity extends Activity {
     private LiteEngine.Result result;
     private LiteEngine.Rule rule;
     private boolean playing = false;
+    private boolean controllerShown = true;
     private String pendingResolveName = "";
     private int resolveTick = 0;
     private final List<Runnable> resolveTimers = new ArrayList<Runnable>();
@@ -481,8 +482,9 @@ public class LiteActivity extends Activity {
                 return true;
             }
             if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
-                if (playerView.isControllerVisible()) playerView.hideController();
-                else playerView.showController();
+                // PlayerView 没有 isControllerVisible()，自己记状态
+                if (controllerShown) { playerView.hideController(); controllerShown = false; }
+                else { playerView.showController(); controllerShown = true; }
                 return true;
             }
         }
