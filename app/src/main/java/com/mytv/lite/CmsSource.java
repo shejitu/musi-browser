@@ -3,6 +3,7 @@ package com.mytv.lite;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,6 +12,8 @@ import java.util.List;
  *
  * 只依赖 HTTP + JSON，不需要 TVBox 的爬虫内核，所以「小盒子多仓」里那些
  * type=1 的站点拿来就能用。
+ *
+ * 6.2 补了 search()：豆瓣榜单里的片名要拿它去各源里找能播的那一条。
  */
 public class CmsSource {
 
@@ -28,8 +31,28 @@ public class CmsSource {
     public static List<Poster> list(String api, int page) throws Exception {
         final String base = normalize(api);
         String url = base + (base.contains("?") ? "&" : "?") + "pg=" + page;
+        List<Poster> out = parse(JSONUtil.parse(ReposHttp.get(url)), base);
+        if (out.isEmpty()) throw new Exception("该源返回空列表");
+        return out;
+    }
 
-        JSONObject d = JSONUtil.parse(ReposHttp.get(url));
+    /**
+     * 按关键词搜。
+     *
+     * 苹果CMS 的搜索参数是 wd，走的是同一个 videolist 接口，
+     * 所以拿到的字段和列表页完全一致，不用另写一套解析。
+     *
+     * @return 可能为空列表（这个源没有这部片），不抛异常
+     */
+    public static List<Poster> search(String api, String keyword) throws Exception {
+        final String base = normalize(api);
+        String url = base + (base.contains("?") ? "&" : "?")
+                + "wd=" + URLEncoder.encode(keyword == null ? "" : keyword.trim(), "UTF-8");
+        return parse(JSONUtil.parse(ReposHttp.get(url)), base);
+    }
+
+    /** 列表页与搜索页共用的解析。 */
+    private static List<Poster> parse(JSONObject d, String base) throws Exception {
         if (d == null) throw new Exception("接口无响应");
         JSONArray arr = d.optJSONArray("list");
         if (arr == null) throw new Exception("不是苹果CMS协议(无 list)");
@@ -54,8 +77,6 @@ public class CmsSource {
             p.douban = false;
             out.add(p);
         }
-
-        if (out.isEmpty()) throw new Exception("该源返回空列表");
         return out;
     }
 }

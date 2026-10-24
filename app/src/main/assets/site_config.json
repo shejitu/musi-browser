@@ -1,36 +1,7 @@
 {
-  "version": 1,
+  "version": 2,
+  "note": "6.2 移除：乌龟影院 / 思古影视 / 酷壳影视 / 乐猪影视 / 阿里影视 / 扛把子影院（站点打不开或改版，留着只是白点）",
   "sites": [
-    {
-      "name": "乌龟影院",
-      "url": "https://www.wuguiyy.com",
-      "desc": "影视"
-    },
-    {
-      "name": "思古影视",
-      "url": "https://www.siguyy.com",
-      "desc": "影视"
-    },
-    {
-      "name": "酷壳影视",
-      "url": "https://cokemv.me",
-      "desc": "影视"
-    },
-    {
-      "name": "乐猪影视",
-      "url": "http://www.lezhutv.com",
-      "desc": "影视"
-    },
-    {
-      "name": "阿里影视",
-      "url": "https://auete.com",
-      "desc": "影视"
-    },
-    {
-      "name": "扛把子影院",
-      "url": "https://www.ququmc.com",
-      "desc": "影视"
-    },
     {
       "name": "YouTube",
       "url": "https://www.youtube.com",

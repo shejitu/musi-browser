@@ -55,13 +55,12 @@ public class SitesPanel {
             } catch (Throwable ignore) { }
         }
         // 3) 内置兜底
+        //    6.2：乌龟影院 / 思古影视 / 酷壳影视 / 乐猪影视 / 阿里影视 / 扛把子影院
+        //    这 6 个站已失效，兜底列表里也一并去掉，免得网断了反而冒出打不开的站。
         if (out.isEmpty()) {
-            out.add(new Site("乌龟影院", "https://www.wuguiyy.com", "影视"));
-            out.add(new Site("思古影视", "https://www.siguyy.com", "影视"));
-            out.add(new Site("酷壳影视", "https://cokemv.me", "影视"));
-            out.add(new Site("乐猪影视", "http://www.lezhutv.com", "影视"));
-            out.add(new Site("阿里影视", "https://auete.com", "影视"));
-            out.add(new Site("扛把子影院", "https://www.ququmc.com", "影视"));
+            out.add(new Site("YouTube", "https://www.youtube.com", "全球视频"));
+            out.add(new Site("Bilibili", "https://www.bilibili.com", "B站"));
+            out.add(new Site("CCTV直播", "https://tv.cctv.com/live/", "央视直播"));
         }
         cached = out;
         return out;

@@ -25,32 +25,41 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 慕思影视 6.0 — 打开即海报墙，默认走「小盒子多仓」的影视源。
+ * 慕思影视 6.2 — 打开即海报墙，第 1 页是豆瓣高分，第 2 页起才是影视源。
  *
- * 5.0 用的是豆瓣条目，只能看不能播，还得再搜一次才有片源。
- * 6.0 换成真正的影视源：玄珠 / 小马 / dxawi 三个仓，都是标准苹果CMS接口，
- * 海报上带着片源信息，点一下直接进选集，遥控器按两下就能放。
+ * 为什么第 1 页是豆瓣：
+ *   豆瓣高分榜解决的是「看什么」，权威、海报好、一屏就能决定；
+ *   影视源解决的是「在哪播」，同一部片不同源画质差很多。
+ *   6.0/6.1 一打开就是某个源的最新更新，那是仓库视角，不是观众视角。
  *
- * 每个分组里备了多个源，一个连不上会自动换下一个，不用手动切。
- * 豆瓣不再作为进入口（它只提供片名，不提供片源）。
+ * 豆瓣只发现不播放，所以点海报时会在后台拿片名去内置影视源里找，
+ * 找到了按钮直接变成「▶ 播放（红牛）」，按 OK 就进选集 —— 看不出中间那一步。
  */
 public class HomeActivity extends Activity {
 
     /* ============ 数据源 ============ */
 
     /**
-     * 6.0：tab 来自 SourceBook —— 玄珠 / 小马 / dxawi 三个仓 + 两个自带接口的网页站。
-     * 默认停在第 0 个（玄珠），不再用豆瓣当进入口。
+     * 豆瓣一页取多少条。实测「豆瓣高分」能翻到 500 部左右（start=450 还有、600 空），
+     * 30 一页够看十几页，电视上一屏 5 列 × 6 行刚好。
      */
+    private static final int DB_PAGE = 30;
 
     private int tab = 0;
-    private int curPage = 1;             // 影视源页码，从 1 开始
+    private int curPage = 1;             // 页码，从 1 开始
     private int requestSeq = 0;          // 防止慢请求回来覆盖新结果
+    /** 豆瓣榜单一共就 100 条左右，翻到底就不再去请求了 */
+    private int dbEndPage = Integer.MAX_VALUE;
     private final List<Poster> items = new ArrayList<>();
 
     /** 当前 tab 实际命中的源（同一组会按顺序试，失败换下一个） */
     private String curApi = "";
     private String curSrcName = "";
+
+    /* ---- 豆瓣片源预匹配（详情面板里的「▶ 播放」用它） ---- */
+    private String hitApi = "", hitName = "", hitId = "";
+    private boolean hitLoading = false, pendingPlay = false;
+    private int detailSeq = 0;           // 关掉面板后旧回调自动作废
 
     /* ============ 视图 ============ */
 
@@ -161,11 +170,8 @@ public class HomeActivity extends Activity {
         status.setTextSize(13);
         statusRow.addView(status, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-        prevBtn = addPagerBtn(statusRow, "◀ 上一页", v -> {
-            if (curPage > 1) loadGroup(curPage - 1);
-            else toast("已经是第一页");
-        });
-        nextBtn = addPagerBtn(statusRow, "下一页 ▶", v -> loadGroup(curPage + 1));
+        prevBtn = addPagerBtn(statusRow, "◀ 上一页", v -> goPage(curPage - 1));
+        nextBtn = addPagerBtn(statusRow, "下一页 ▶", v -> goPage(curPage + 1));
 
         /* ---- 海报墙 ---- */
         gridScroll = new ScrollView(this);
@@ -270,6 +276,7 @@ public class HomeActivity extends Activity {
         tab = idx;
         curPage = 1;
         firstRender = true;
+        if (SourceBook.group(idx).isDouban()) dbEndPage = Integer.MAX_VALUE;   // 重新判断豆瓣榜单长度
         for (int i = 0; i < tabRow.getChildCount(); i++) {
             View v = tabRow.getChildAt(i);
             if (v instanceof TextView) styleTab((TextView) v, i == tab, v.hasFocus());
@@ -280,9 +287,23 @@ public class HomeActivity extends Activity {
     }
 
     /**
+     * 翻页入口。
+     *
+     * 豆瓣榜单不是无限的（这个接口最多给 100 条左右），翻到底就明确告诉用户，
+     * 不要像以前那样每次点都发一次请求再显示「取不到」。
+     */
+    private void goPage(int pg) {
+        SourceBook.Group g = SourceBook.group(tab);
+        if (pg < 1) { toast("已经是第一页"); return; }
+        if (g.isDouban() && pg > dbEndPage) { toast("豆瓣高分已经到底了"); return; }
+        loadGroup(pg);
+    }
+
+    /**
      * 取当前 tab 的一页海报。
      *
-     * 一个分组里有多个候选源，按顺序试：第一个能返回数据的就用，失败自动换下一个。
+     * 豆瓣组走豆瓣榜单接口（只发现），其余组走苹果CMS（能直接播）。
+     * CMS 组里备了多个源，按顺序试：第一个能返回数据的就用，失败自动换下一个。
      * 这样不用你手动切源 —— 「玄珠」挂了会自己落到红牛/量子/非凡。
      */
     private void loadGroup(final int pg) {
@@ -291,9 +312,44 @@ public class HomeActivity extends Activity {
         curPage = pg;
 
         grid.removeAllViews();
-        status.setText("正在连「" + g.label + "」…");
+        status.setText(g.isDouban() ? "正在取「豆瓣高分」第 " + pg + " 页…" : "正在连「" + g.label + "」…");
 
         new Thread(() -> {
+            /* ---------- 豆瓣：只发现，不能播 ---------- */
+            if (g.isDouban()) {
+                try {
+                    final List<Poster> got = DoubanSource.list(g.dbTag, g.dbSort,
+                            (pg - 1) * DB_PAGE, DB_PAGE);
+                    handler.post(() -> {
+                        if (mySeq != requestSeq || isFinishing()) return;
+                        if (got.isEmpty() && pg > 1) {      // 到底了，回上一页
+                            dbEndPage = pg - 1;
+                            status.setText("豆瓣高分已经到底了");
+                            loadGroup(pg - 1);
+                            return;
+                        }
+                        if (got.size() < DB_PAGE) dbEndPage = pg;   // 不满一页 = 最后一页
+                        curApi = "";
+                        curSrcName = "豆瓣";
+                        items.clear();
+                        items.addAll(got);
+                        renderGrid();
+                        status.setText("豆瓣高分 · 第 " + pg + " 页 · " + items.size()
+                                + " 部 · 点海报自动找片源");
+                    });
+                } catch (Exception e) {
+                    final String msg = e.getMessage() == null ? "豆瓣连不上" : e.getMessage();
+                    handler.post(() -> {
+                        if (mySeq != requestSeq || isFinishing()) return;
+                        if (pg > 1) { loadGroup(pg - 1); return; }
+                        status.setText("✗ 豆瓣暂时连不上（" + msg + "），先看第 2 页起的影视源");
+                        renderEmptyHint();
+                    });
+                }
+                return;
+            }
+
+            /* ---------- 苹果CMS：能直接播 ---------- */
             Exception last = null;
             for (SourceBook.Src src : g.list) {
                 try {
@@ -504,6 +560,12 @@ public class HomeActivity extends Activity {
         detailPanel.removeAllViews();
         detailPanel.setVisibility(View.VISIBLE);
 
+        // 每开一次面板就重置一次预匹配结果，关掉后旧回调靠 seq 自动作废
+        final int myDetail = ++detailSeq;
+        hitApi = hitName = hitId = "";
+        hitLoading = false;
+        pendingPlay = false;
+
         TextView close = new TextView(this);
         close.setText("✕ 关闭");
         close.setTextColor(0xFF80809A);
@@ -551,8 +613,8 @@ public class HomeActivity extends Activity {
         box.addView(intro, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        TextView play = new TextView(this);
-        play.setText("▶ 在影视源里搜这部片");
+        final TextView play = new TextView(this);
+        play.setText(p.playable() ? "▶ 选集播放" : "▶ 播放（正在找片源…）");
         play.setTextColor(Color.WHITE);
         play.setTextSize(15);
         play.setGravity(Gravity.CENTER);
@@ -568,7 +630,7 @@ public class HomeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         final TextView site = new TextView(this);
-        site.setText("匹配可用影视源中…");
+        site.setText(p.playable() ? "片源：" + curSrcName : "正在影视源里找这部片…");
         site.setTextColor(0xFF70708A);
         site.setTextSize(12);
         site.setPadding(0, dp(8), 0, dp(8));
@@ -596,22 +658,24 @@ public class HomeActivity extends Activity {
 
         play.setOnClickListener(v -> {
             if (p.playable()) {
-                VodActivity.launchSearch(this, p.apiBase, "影视源", p.title);
+                VodActivity.launchDetail(this, p.apiBase, curSrcName, p.id, p.title);
                 return;
             }
-            site.setText("正在匹配影视源…");
-            CmsFinder.find(this, new CmsFinder.Cb() {
-                @Override public void found(String api, String siteName) {
-                    if (isFinishing()) return;
-                    site.setText("✓ 源：" + siteName);
-                    VodActivity.launchSearch(HomeActivity.this, api, siteName, p.title);
-                }
-                @Override public void fail(String msg) {
-                    if (isFinishing()) return;
-                    site.setText("✗ " + msg + "，请到「仓库」里加一个 CMS 接口");
-                }
-            });
+            if (!hitId.isEmpty()) {           // 后台已经匹配好了，一按就播
+                VodActivity.launchDetail(this, hitApi, hitName, hitId, p.title);
+                return;
+            }
+            if (hitLoading) {                 // 还在找：找到就自动跳，不用再按一次
+                pendingPlay = true;
+                play.setText("找到就自动播放…");
+                return;
+            }
+            startFind(p.title, play, site, myDetail, true);
         });
+
+        // 豆瓣条目：面板先出来给人看简介，同时在后台找能播的源。
+        // 命中后按钮会变成「▶ 播放（红牛）」，用户根本感觉不到中间那一步。
+        if (!p.playable()) startFind(p.title, play, site, myDetail, false);
 
         // 豆瓣详情：只影响面板文字，失败就保持「暂无简介」
         if (p.douban) {
@@ -644,7 +708,43 @@ public class HomeActivity extends Activity {
         play.post(play::requestFocus);
     }
 
+    /**
+     * 拿片名去内置影视源里找能播的那一条（豆瓣条目专用）。
+     *
+     * @param autoJump false = 只是打开面板时的预匹配，命中只改按钮文字，不打断看简介
+     *                 true  = 用户已经按了播放，命中就直接进选集
+     */
+    private void startFind(final String keyword, final TextView play, final TextView site,
+                           final int seq, final boolean autoJump) {
+        hitLoading = true;
+        play.setText("正在找片源…");
+        SourceBook.findPlayable(keyword, new SourceBook.Found() {
+            @Override public void ok(String api, String siteName, String vodId, String title) {
+                if (isFinishing() || seq != detailSeq) return;
+                hitApi = api;
+                hitName = siteName;
+                hitId = vodId;
+                hitLoading = false;
+                site.setText("✓ 片源：" + siteName + " · " + title);
+                play.setText("▶ 播放（" + siteName + "）");
+                if (autoJump || pendingPlay) {
+                    pendingPlay = false;
+                    VodActivity.launchDetail(HomeActivity.this, api, siteName, vodId, title);
+                }
+            }
+
+            @Override public void fail(String msg) {
+                if (isFinishing() || seq != detailSeq) return;
+                hitLoading = false;
+                pendingPlay = false;
+                site.setText("✗ " + msg + "\n可切到第 2 页起的影视源手动挑，或点下面用豆瓣页面看");
+                play.setText("▶ 重试找片源");
+            }
+        });
+    }
+
     private void hideDetail() {
+        detailSeq++;                    // 面板关掉后，还在路上的找源回调不再动界面
         detailPanel.setVisibility(View.GONE);
         detailPanel.removeAllViews();
     }
@@ -658,7 +758,7 @@ public class HomeActivity extends Activity {
     private void showGuideIfNeeded() {
         final android.content.SharedPreferences sp =
                 getSharedPreferences("musi", MODE_PRIVATE);
-        if (sp.getBoolean("guide_seen_v61", false)) return;
+        if (sp.getBoolean("guide_seen_v62", false)) return;
 
         final FrameLayout overlay = new FrameLayout(this);
         overlay.setBackgroundColor(0xE6000000);
@@ -722,7 +822,7 @@ public class HomeActivity extends Activity {
             wrapper.removeView(guideOverlay);
             guideOverlay = null;
         }
-        getSharedPreferences("musi", MODE_PRIVATE).edit().putBoolean("guide_seen_v61", true).apply();
+        getSharedPreferences("musi", MODE_PRIVATE).edit().putBoolean("guide_seen_v62", true).apply();
         // 关掉后把焦点交给第一张海报，遥控器不用再乱按
         grid.post(() -> {
             if (grid.getChildCount() > 0 && grid.getChildAt(0) instanceof LinearLayout) {
