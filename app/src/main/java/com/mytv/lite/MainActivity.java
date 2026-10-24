@@ -163,7 +163,7 @@ public class MainActivity extends Activity {
             }, (url, title, probe) -> {
                 // v4.1 轻站：把当前页的探测结果交给 TV 化面板
                 LiteActivity.launch(MainActivity.this, url, title, probe);
-            });
+            }, this::toggleSites);
             ((FrameLayout) findViewById(android.R.id.content)).addView(browser,
                     new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
@@ -174,16 +174,45 @@ public class MainActivity extends Activity {
         showSites();
     }
 
+    /** 6.1：站点面板开关 —— 顶栏「📁 站点」与菜单键都走这里，随时能切站 */
+    private void toggleSites() {
+        if (!browserMode) return;
+        if (sitesHost != null && sitesHost.getVisibility() == View.VISIBLE) {
+            sitesHost.setVisibility(View.GONE);
+            if (browser != null && browser.getWebView() != null) browser.getWebView().requestFocus();
+        } else {
+            showSites();
+        }
+    }
+
     private void showSites() {
         if (sitesHost == null) {
             sitesHost = new LinearLayout(this);
             sitesHost.setBackgroundColor(0xF2101010);
             ((FrameLayout) findViewById(android.R.id.content)).addView(sitesHost,
-                    new FrameLayout.LayoutParams(dp(440), ViewGroup.LayoutParams.MATCH_PARENT));
+                    new FrameLayout.LayoutParams(dp(460), ViewGroup.LayoutParams.MATCH_PARENT));
         }
         sitesHost.removeAllViews();
-        sitesHost.addView(SitesPanel.build(this, browser, () -> sitesHost.setVisibility(View.GONE)));
+        sitesHost.addView(SitesPanel.build(this, browser, () -> {
+            sitesHost.setVisibility(View.GONE);
+            if (browser != null && browser.getWebView() != null) browser.getWebView().requestFocus();
+        }));
         sitesHost.setVisibility(View.VISIBLE);
+        // 面板一出现就把焦点拿进来，否则遥控器还在网页里，看着像「点了没反应」
+        sitesHost.post(() -> focusFirst(sitesHost));
+    }
+
+    /** 找第一个可聚焦的子控件并聚焦 */
+    private boolean focusFirst(View v) {
+        if (v == null) return false;
+        if (v.isFocusable() && v.getVisibility() == View.VISIBLE) return v.requestFocus();
+        if (v instanceof ViewGroup) {
+            ViewGroup g = (ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) {
+                if (focusFirst(g.getChildAt(i))) return true;
+            }
+        }
+        return false;
     }
 
     private void exitBrowser() {
@@ -358,15 +387,24 @@ public class MainActivity extends Activity {
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (browserMode) {
             if (keyCode == KeyEvent.KEYCODE_BACK) {
-                if (sitesHost != null && sitesHost.getVisibility() == View.VISIBLE) { sitesHost.setVisibility(View.GONE); return true; }
+                // 面板开着 = 已经在最外层，再按返回就退出浏览器
+                if (sitesHost != null && sitesHost.getVisibility() == View.VISIBLE) {
+                    finish();
+                    return true;
+                }
                 if (browser.handleBack()) return true;
-                // 无页可退：回主页（finish 本页，Home 在栈底自然显示）
-                finish();
+                // 网页已经退到第一页：不直接退出，先把站点面板叫出来（6.1）
+                // 这样遥控器上「返回」就一定能回到站点列表，不会卡在某个网页里出不来
+                showSites();
                 return true;
             }
-            // 菜单键 / 遥控器颜色键：一键轻站
-            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO
-                    || keyCode == KeyEvent.KEYCODE_BUTTON_Y) {
+            // 菜单键 / INFO：开关站点面板（6.0 这里是轻站，导致面板关掉后再也调不回来）
+            if (keyCode == KeyEvent.KEYCODE_MENU || keyCode == KeyEvent.KEYCODE_INFO) {
+                toggleSites();
+                return true;
+            }
+            // 遥控器 Y 键：一键轻站
+            if (keyCode == KeyEvent.KEYCODE_BUTTON_Y) {
                 browser.runLite();
                 return true;
             }

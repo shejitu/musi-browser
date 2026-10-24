@@ -14,6 +14,7 @@
     android:label="慕思浏览器"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.MyTV"
+        android:name=".MusiApp"
         android:usesCleartextTraffic="true"
         android:banner="@drawable/banner">
 
@@ -40,6 +41,10 @@
             android:screenOrientation="landscape" />
         <activity android:name=".VodActivity" android:exported="false"
             android:screenOrientation="landscape" />
+        <!-- 6.1 轻量播放：只起一个 ExoPlayer，专门播选集直链 -->
+        <activity android:name=".PlayActivity" android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
         <activity android:name=".FilesActivity" android:exported="false"
             android:screenOrientation="landscape" />
         <activity android:name=".RepoPickerActivity" android:exported="false"

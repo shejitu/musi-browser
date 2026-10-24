@@ -434,8 +434,13 @@ public class HomeActivity extends Activity {
         // 影视源的海报是「有片源」的，直接进选集，少按两下遥控器；
         // 没有片源信息的（理论上不会有）才落到详情面板。
         card.setOnClickListener(v -> {
+            // 影视源的海报是「有片源」的，直接进选集，少按两下遥控器
             if (p.playable()) {
-                VodActivity.launchDetail(this, p.apiBase, curSrcName, p.id, p.title);
+                try {
+                    VodActivity.launchDetail(this, p.apiBase, curSrcName, p.id, p.title);
+                } catch (Throwable t) {
+                    toast("打开失败：" + t.getClass().getSimpleName());
+                }
             } else {
                 showDetail(p);
             }
@@ -653,7 +658,7 @@ public class HomeActivity extends Activity {
     private void showGuideIfNeeded() {
         final android.content.SharedPreferences sp =
                 getSharedPreferences("musi", MODE_PRIVATE);
-        if (sp.getBoolean("guide_seen_v6", false)) return;
+        if (sp.getBoolean("guide_seen_v61", false)) return;
 
         final FrameLayout overlay = new FrameLayout(this);
         overlay.setBackgroundColor(0xE6000000);
@@ -717,7 +722,7 @@ public class HomeActivity extends Activity {
             wrapper.removeView(guideOverlay);
             guideOverlay = null;
         }
-        getSharedPreferences("musi", MODE_PRIVATE).edit().putBoolean("guide_seen_v6", true).apply();
+        getSharedPreferences("musi", MODE_PRIVATE).edit().putBoolean("guide_seen_v61", true).apply();
         // 关掉后把焦点交给第一张海报，遥控器不用再乱按
         grid.post(() -> {
             if (grid.getChildCount() > 0 && grid.getChildAt(0) instanceof LinearLayout) {

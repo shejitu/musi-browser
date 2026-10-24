@@ -32,6 +32,8 @@ public class BrowserView extends FrameLayout {
     public interface OnPlayVideo { void play(String url, String title); }
     /** 轻站：把探测结果（JSON 原文）交给轻站面板 */
     public interface OnLite { void open(String url, String title, String probeJson); }
+    /** 6.1：顶栏「📁 站点」按钮 —— 随时把站点面板叫回来，不用退出重进 */
+    public interface OnSites { void toggle(); }
 
     private WebView web;
     private EditText searchBox;
@@ -42,26 +44,45 @@ public class BrowserView extends FrameLayout {
     private String pendingVideoTitle = null;
     private final OnPlayVideo callback;
     private final OnLite liteCallback;
+    private final OnSites sitesCallback;
     private static final String[] VIDEO_EXT = {".m3u8", ".mp4", ".flv", ".ts", ".mkv", ".avi"};
 
     @SuppressLint("SetJavaScriptEnabled")
-    public BrowserView(Activity act, OnPlayVideo onPlay, OnLite onLite) {
+    public BrowserView(Activity act, OnPlayVideo onPlay, OnLite onLite, OnSites onSites) {
         super(act);
         this.callback = onPlay;
         this.liteCallback = onLite;
+        this.sitesCallback = onSites;
         setBackgroundColor(Color.BLACK);
 
         LinearLayout root = new LinearLayout(act);
         root.setOrientation(LinearLayout.VERTICAL);
         addView(root, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
 
-        // 顶栏：搜索框 + 轻站 + 播放
+        // 顶栏：站点 + 搜索框 + 轻站 + 播放
         LinearLayout bar = new LinearLayout(act);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setPadding(16, 12, 16, 12);
         bar.setBackgroundColor(0xE6101010);
         bar.setGravity(Gravity.CENTER_VERTICAL);
         root.addView(bar, new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+
+        // 6.1：站点面板的固定入口。6.0 是「进来弹一次，点完就没了」，所以再也切不了站。
+        Button sitesBtn = new Button(act);
+        sitesBtn.setText("📁 站点");
+        sitesBtn.setTextSize(14);
+        sitesBtn.setAllCaps(false);
+        sitesBtn.setTextColor(0xFF101018);
+        sitesBtn.setBackgroundColor(0xFF4FC3F7);
+        sitesBtn.setFocusable(true);
+        sitesBtn.setFocusableInTouchMode(true);
+        sitesBtn.setOnClickListener(v -> {
+            if (sitesCallback != null) sitesCallback.toggle();
+        });
+        LinearLayout.LayoutParams sitesLp = new LinearLayout.LayoutParams(
+                LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        sitesLp.setMargins(0, 0, 12, 0);
+        bar.addView(sitesBtn, sitesLp);
 
         searchBox = new EditText(act);
         searchBox.setHint("输入网址或搜索关键词");
