@@ -12,6 +12,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -150,10 +151,18 @@ public class HomeActivity extends Activity {
         addTopAction(topRow, "⟳ 刷新", v -> selectTab(tab));
 
         /* ---- tab 行 ---- */
+        // 6.2 有 6 个 tab（豆瓣 + 5 组源），720p 电视上按 dp 算会顶出屏幕，
+        // 所以套一层横向滚动：宽屏一眼全见，窄屏能左右滑。
+        HorizontalScrollView tabScroll = new HorizontalScrollView(this);
+        tabScroll.setHorizontalScrollBarEnabled(false);
+        tabScroll.setClipToPadding(false);
+
         tabRow = new LinearLayout(this);
         tabRow.setOrientation(LinearLayout.HORIZONTAL);
         tabRow.setPadding(0, dp(8), 0, 0);
-        root.addView(tabRow, new LinearLayout.LayoutParams(
+        tabScroll.addView(tabRow, new HorizontalScrollView.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        root.addView(tabScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         for (int i = 0; i < SourceBook.size(); i++) addTabItem(i);
 
