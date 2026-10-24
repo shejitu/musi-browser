@@ -25,28 +25,32 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 慕思影视 5.0 — 打开即海报墙。
+ * 慕思影视 6.0 — 打开即海报墙，默认走「小盒子多仓」的影视源。
  *
- * 以前这里是四个大卡片的功能入口，要点「海报墙」再经过一层仓库扫描才看得到片子，
- * 扫描失败就只剩一行提示，所以实际用起来等于「没有海报墙」。
+ * 5.0 用的是豆瓣条目，只能看不能播，还得再搜一次才有片源。
+ * 6.0 换成真正的影视源：玄珠 / 小马 / dxawi 三个仓，都是标准苹果CMS接口，
+ * 海报上带着片源信息，点一下直接进选集，遥控器按两下就能放。
  *
- * 现在：开屏直接是一屏竖版海报墙，默认数据来自豆瓣（热映 / 最新 / 高分），
- * 不依赖任何仓库配置，装完就能看到最近在放什么。原功能入口缩成顶栏小按钮，
- * 一个都没少。点海报可看简介，也可带着片名去影视源里搜来直接播。
+ * 每个分组里备了多个源，一个连不上会自动换下一个，不用手动切。
+ * 豆瓣不再作为进入口（它只提供片名，不提供片源）。
  */
 public class HomeActivity extends Activity {
 
     /* ============ 数据源 ============ */
 
-    private static final String[] TAB_LABEL = {"🔥 热映", "🆕 最新", "⭐ 高分", "📚 影视源"};
-    private static final String[] TAB_TAG   = {"热门", "最新", "豆瓣高分", null};
-    private static final String[] TAB_SORT  = {"recommend", "time", "recommend", null};
-    private static final int PAGE_SIZE = 20;
+    /**
+     * 6.0：tab 来自 SourceBook —— 玄珠 / 小马 / dxawi 三个仓 + 两个自带接口的网页站。
+     * 默认停在第 0 个（玄珠），不再用豆瓣当进入口。
+     */
 
     private int tab = 0;
-    private int pageStart = 0;
+    private int curPage = 1;             // 影视源页码，从 1 开始
     private int requestSeq = 0;          // 防止慢请求回来覆盖新结果
     private final List<Poster> items = new ArrayList<>();
+
+    /** 当前 tab 实际命中的源（同一组会按顺序试，失败换下一个） */
+    private String curApi = "";
+    private String curSrcName = "";
 
     /* ============ 视图 ============ */
 
@@ -58,6 +62,7 @@ public class HomeActivity extends Activity {
 
     private int cols = 5, cellW = 240, posterH = 340;
     private boolean firstRender = true;   // 只有首屏抢焦点，翻页不打断当前选中
+    private View guideOverlay;            // 遥控器指引浮层（一次性）
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable clockTick = new Runnable() {
@@ -74,6 +79,7 @@ public class HomeActivity extends Activity {
         measureGrid();
         buildUi();
         selectTab(0);
+        showGuideIfNeeded();
         handler.post(clockTick);
         startServer();
         try { UpdateChecker.check(this); } catch (Throwable ignore) { }
@@ -140,7 +146,7 @@ public class HomeActivity extends Activity {
         tabRow.setPadding(0, dp(8), 0, 0);
         root.addView(tabRow, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        for (int i = 0; i < TAB_LABEL.length; i++) addTabItem(i);
+        for (int i = 0; i < SourceBook.size(); i++) addTabItem(i);
 
         /* ---- 状态行 + 翻页 ---- */
         LinearLayout statusRow = new LinearLayout(this);
@@ -156,10 +162,10 @@ public class HomeActivity extends Activity {
         statusRow.addView(status, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         prevBtn = addPagerBtn(statusRow, "◀ 上一页", v -> {
-            if (pageStart >= PAGE_SIZE) load(pageStart - PAGE_SIZE, false);
+            if (curPage > 1) loadGroup(curPage - 1);
             else toast("已经是第一页");
         });
-        nextBtn = addPagerBtn(statusRow, "下一页 ▶", v -> load(pageStart + PAGE_SIZE, true));
+        nextBtn = addPagerBtn(statusRow, "下一页 ▶", v -> loadGroup(curPage + 1));
 
         /* ---- 海报墙 ---- */
         gridScroll = new ScrollView(this);
@@ -233,7 +239,7 @@ public class HomeActivity extends Activity {
 
     private void addTabItem(final int idx) {
         TextView t = new TextView(this);
-        t.setText(TAB_LABEL[idx]);
+        t.setText(SourceBook.group(idx).label);
         t.setTextSize(15);
         t.setPadding(dp(16), dp(6), dp(16), dp(6));
         t.setFocusable(true);
@@ -262,55 +268,65 @@ public class HomeActivity extends Activity {
 
     private void selectTab(int idx) {
         tab = idx;
-        pageStart = 0;
+        curPage = 1;
         firstRender = true;
         for (int i = 0; i < tabRow.getChildCount(); i++) {
             View v = tabRow.getChildAt(i);
             if (v instanceof TextView) styleTab((TextView) v, i == tab, v.hasFocus());
         }
-        if (idx == 3) { openCmsWall(); return; }
         items.clear();
         grid.removeAllViews();
-        load(0, false);
+        loadGroup(1);
     }
 
-    private void load(final int from, final boolean append) {
+    /**
+     * 取当前 tab 的一页海报。
+     *
+     * 一个分组里有多个候选源，按顺序试：第一个能返回数据的就用，失败自动换下一个。
+     * 这样不用你手动切源 —— 「玄珠」挂了会自己落到红牛/量子/非凡。
+     */
+    private void loadGroup(final int pg) {
         final int mySeq = ++requestSeq;
-        if (!append) {
-            grid.removeAllViews();
-            status.setText("正在获取豆瓣「" + TAB_TAG[tab] + "」…");
-        } else {
-            status.setText("加载更多…");
-        }
+        final SourceBook.Group g = SourceBook.group(tab);
+        curPage = pg;
 
-        final String tag = TAB_TAG[tab];
-        final String sort = TAB_SORT[tab];
+        grid.removeAllViews();
+        status.setText("正在连「" + g.label + "」…");
 
         new Thread(() -> {
-            try {
-                final List<Poster> got = DoubanSource.list(tag, sort, from, PAGE_SIZE);
-                handler.post(() -> {
-                    if (mySeq != requestSeq || isFinishing()) return;
-                    if (got.isEmpty() && !append) {
-                        status.setText("豆瓣没有返回内容，可点上方「📚 影视源」直接进影视源");
-                        return;
-                    }
-                    if (!append) items.clear();
-                    items.addAll(got);
-                    pageStart = from;
-                    renderGrid();
-                    status.setText("共 " + items.size() + " 部 · " + tag
-                            + " · 第 " + (from / PAGE_SIZE + 1) + " 页");
-                });
-            } catch (final Exception e) {
-                handler.post(() -> {
-                    if (mySeq != requestSeq || isFinishing()) return;
-                    String msg = e.getMessage() == null ? "未知错误" : e.getMessage();
-                    status.setText("✗ 豆瓣加载失败：" + msg + "　（可点「📚 影视源」走影视源海报墙）");
-                    if (items.isEmpty()) renderEmptyHint();
-                });
+            Exception last = null;
+            for (SourceBook.Src src : g.list) {
+                try {
+                    List<Poster> got = CmsSource.list(src.api, pg);
+                    final String api = CmsSource.normalize(src.api);
+                    final String nm = src.name;
+                    handler.post(() -> {
+                        if (mySeq != requestSeq || isFinishing()) return;
+                        curApi = api;
+                        curSrcName = nm;
+                        items.clear();
+                        items.addAll(got);
+                        renderGrid();
+                        status.setText(g.label + " · " + nm + " · 第 " + pg + " 页 · " + items.size() + " 部");
+                    });
+                    return;
+                } catch (Exception e) {
+                    last = e;
+                }
             }
-        }, "douban-list").start();
+            final String msg = last == null ? "没有可用源" :
+                    (last.getMessage() == null ? last.getClass().getSimpleName() : last.getMessage());
+            handler.post(() -> {
+                if (mySeq != requestSeq || isFinishing()) return;
+                if (pg > 1) {                       // 翻页失败就退回第 1 页，别把界面清空
+                    status.setText("✗ 第 " + pg + " 页没取到，已退回第 1 页");
+                    loadGroup(1);
+                    return;
+                }
+                status.setText("✗ " + g.label + " 暂时连不上（" + msg + "），换一个 tab 试试");
+                renderEmptyHint();
+            });
+        }, "cms-list").start();
     }
 
     private void renderGrid() {
@@ -345,14 +361,15 @@ public class HomeActivity extends Activity {
             more.setBackground(f ? focus : normal);
             more.setTextColor(f ? 0xFFFFFFFF : 0xFF9A9AB4);
         });
-        more.setOnClickListener(v -> load(pageStart + PAGE_SIZE, true));
+        more.setOnClickListener(v -> loadGroup(curPage + 1));
         tail.addView(more, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         grid.addView(tail, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         // 首屏把焦点放到第一张海报；翻页时不抢焦点，避免打断当前的选中位置
-        if (firstRender && !tabRow.hasFocus()) {
+        // 首屏把焦点放到第一张海报；但指引浮层开着的时候不抢，否则「知道了」按不到
+        if (firstRender && !tabRow.hasFocus() && guideOverlay == null) {
             firstRender = false;
             grid.post(() -> {
                 if (grid.getChildCount() > 0 && grid.getChildAt(0) instanceof LinearLayout) {
@@ -414,7 +431,15 @@ public class HomeActivity extends Activity {
             card.setBackground(f ? focus : normal);
             name.setTextColor(f ? 0xFF4FC3F7 : Color.WHITE);
         });
-        card.setOnClickListener(v -> showDetail(p));
+        // 影视源的海报是「有片源」的，直接进选集，少按两下遥控器；
+        // 没有片源信息的（理论上不会有）才落到详情面板。
+        card.setOnClickListener(v -> {
+            if (p.playable()) {
+                VodActivity.launchDetail(this, p.apiBase, curSrcName, p.id, p.title);
+            } else {
+                showDetail(p);
+            }
+        });
 
         ImagePool.load(p.pic, cellW, posterH, bmp -> {
             if (bmp != null) img.setImageBitmap(bmp);
@@ -425,7 +450,7 @@ public class HomeActivity extends Activity {
     private void renderEmptyHint() {
         grid.removeAllViews();
         TextView t = new TextView(this);
-        t.setText("没有取到内容。\n\n可能原因：网络不通 / 豆瓣暂时受限。\n可以先试下面两个入口，都不影响正常看片。");
+        t.setText("这个源暂时取不到内容。\n\n通常是源站临时抽风或网络被卡，不是 App 的问题。\n下面任意一个入口都能继续看片。");
         t.setTextColor(0xFF80809A);
         t.setTextSize(15);
         t.setPadding(dp(10), dp(30), dp(10), dp(18));
@@ -439,14 +464,9 @@ public class HomeActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         btns.addView(emptyAction("⟳ 重试", v -> selectTab(tab)));
-        btns.addView(emptyAction("📚 影视源海报墙", v -> selectTab(3)));
-        btns.addView(emptyAction("🌐 豆瓣网页版", v -> {
-            android.content.Intent it = new android.content.Intent(this, MainActivity.class);
-            it.putExtra(MainActivity.MODE, MainActivity.MODE_BROWSER);
-            it.putExtra("show_sites", false);
-            it.putExtra("browser_url", "https://movie.douban.com/");
-            startActivity(it);
-        }));
+        // 直接跳到下一个分组，一个源挂了不用手动找
+        btns.addView(emptyAction("→ 下一个源", v -> selectTab((tab + 1) % SourceBook.size())));
+        btns.addView(emptyAction("🌐 推荐影视站", v -> MainActivity.launchBrowser(this)));
     }
 
     private TextView emptyAction(String text, View.OnClickListener l) {
@@ -624,28 +644,85 @@ public class HomeActivity extends Activity {
         detailPanel.removeAllViews();
     }
 
-    /* ==================== 影视源 / 其他 ==================== */
+    /* ==================== 遥控器指引 ==================== */
 
-    /** 「影视源」tab：直接进影视源海报墙；本页不做停留。 */
-    private void openCmsWall() {
-        status.setText("正在寻找可用的影视源…");
-        grid.removeAllViews();
-        CmsFinder.find(this, new CmsFinder.Cb() {
-            @Override public void found(String api, String siteName) {
-                if (isFinishing()) return;
-                status.setText("✓ " + siteName);
-                VodActivity.launch(HomeActivity.this, api, siteName);
-            }
-            @Override public void fail(String msg) {
-                if (isFinishing()) return;
-                status.setText("✗ " + msg);
-                TextView t = new TextView(HomeActivity.this);
-                t.setText(msg + "\n\n到「📁 仓库」里添加一个影视接口地址即可：\n形如 http://xxx/api.php/provide/vod/");
-                t.setTextColor(0xFF80809A);
-                t.setTextSize(15);
-                t.setPadding(0, dp(40), 0, 0);
-                grid.addView(t, new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+    /**
+     * 首次进入显示一次遥控器用法，按 OK / 返回即消失，之后不再出现。
+     * 做成轻量的一层浮层，不打断海报墙的加载。
+     */
+    private void showGuideIfNeeded() {
+        final android.content.SharedPreferences sp =
+                getSharedPreferences("musi", MODE_PRIVATE);
+        if (sp.getBoolean("guide_seen_v6", false)) return;
+
+        final FrameLayout overlay = new FrameLayout(this);
+        overlay.setBackgroundColor(0xE6000000);
+        overlay.setClickable(true);
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(roundRect(0xFF16161F, dp(1.5f), 0xFF4FC3F7));
+        card.setPadding(dp(34), dp(26), dp(34), dp(22));
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                dp(620), ViewGroup.LayoutParams.WRAP_CONTENT);
+        clp.gravity = Gravity.CENTER;
+        overlay.addView(card, clp);
+
+        TextView h = new TextView(this);
+        h.setText("遥控器这样用");
+        h.setTextColor(0xFFFFFFFF);
+        h.setTextSize(21);
+        h.setTypeface(null, android.graphics.Typeface.BOLD);
+        h.setPadding(0, 0, 0, dp(14));
+        card.addView(h);
+
+        for (String line : SourceBook.GUIDE_HOME) {
+            TextView t = new TextView(this);
+            t.setText(line);
+            t.setTextColor(0xFFC8C8DC);
+            t.setTextSize(15);
+            t.setLineSpacing(dp(4), 1f);
+            t.setPadding(0, dp(7), 0, dp(7));
+            card.addView(t);
+        }
+
+        TextView ok = new TextView(this);
+        ok.setText("知道了");
+        ok.setTextColor(Color.WHITE);
+        ok.setTextSize(16);
+        ok.setGravity(Gravity.CENTER);
+        ok.setPadding(dp(20), dp(12), dp(20), dp(12));
+        ok.setFocusable(true);
+        ok.setFocusableInTouchMode(true);
+        ok.setClickable(true);
+        GradientDrawable n = roundRect(0xFFE42112, 0, 0);
+        GradientDrawable f = roundRect(0xFFFF5A39, dp(2f), 0xFFFFFFFF);
+        ok.setBackground(n);
+        ok.setOnFocusChangeListener((v, hasF) -> ok.setBackground(hasF ? f : n));
+        final Runnable close = () -> dismissGuide();
+        ok.setOnClickListener(v -> close.run());
+        LinearLayout.LayoutParams olp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        olp.topMargin = dp(16);
+        card.addView(ok, olp);
+
+        guideOverlay = overlay;
+        wrapper.addView(overlay, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        ok.post(ok::requestFocus);
+    }
+
+    private void dismissGuide() {
+        if (guideOverlay != null) {
+            wrapper.removeView(guideOverlay);
+            guideOverlay = null;
+        }
+        getSharedPreferences("musi", MODE_PRIVATE).edit().putBoolean("guide_seen_v6", true).apply();
+        // 关掉后把焦点交给第一张海报，遥控器不用再乱按
+        grid.post(() -> {
+            if (grid.getChildCount() > 0 && grid.getChildAt(0) instanceof LinearLayout) {
+                LinearLayout r = (LinearLayout) grid.getChildAt(0);
+                if (r.getChildCount() > 0) r.getChildAt(0).requestFocus();
             }
         });
     }
@@ -661,6 +738,7 @@ public class HomeActivity extends Activity {
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (guideOverlay != null) { dismissGuide(); return true; }
             if (detailPanel.getVisibility() == View.VISIBLE) { hideDetail(); return true; }
             finish();
             return true;

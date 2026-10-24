@@ -61,6 +61,20 @@ public class VodActivity extends Activity {
         ctx.startActivity(it);
     }
 
+    /**
+     * 慕思 6.0：带着 vod_id 直接进选集。
+     * 首页海报墙点一下就走这里 —— 少一次「搜索→选片」，遥控器按两下就能播。
+     */
+    public static void launchDetail(Context ctx, String apiUrl, String siteName,
+                                    String vodId, String title) {
+        android.content.Intent it = new android.content.Intent(ctx, VodActivity.class);
+        it.putExtra("api", normalizeApi(apiUrl));
+        it.putExtra("site", siteName);
+        it.putExtra("vod_id", vodId);
+        it.putExtra("title", title);
+        ctx.startActivity(it);
+    }
+
     /** 各类 CMS 接口统一转成 videolist 协议 */
     static String normalizeApi(String api) {
         api = api.trim();
@@ -147,11 +161,20 @@ public class VodActivity extends Activity {
 
         // 慕思 5.0：从首页海报墙带片名进来 → 直接搜索；否则按分类首页加载
         String kw = getIntent().getStringExtra("search");
+        final String directId = getIntent().getStringExtra("vod_id");
+        final String directTitle = getIntent().getStringExtra("title");
         if (kw != null && !kw.trim().isEmpty()) {
             navRow.setVisibility(android.view.View.GONE);
             doSearch(kw.trim());
         } else {
             load(page = 1, currentCategory);
+            // 6.0：海报墙点进来，首页列表照常铺底，同时直接把选集面板拉到前面
+            if (directId != null && !directId.isEmpty()) {
+                Video dv = new Video();
+                dv.id = directId;
+                dv.name = directTitle == null ? "" : directTitle;
+                grid.postDelayed(() -> { if (!isFinishing()) showDetail(dv); }, 300);
+            }
         }
     }
 

@@ -85,35 +85,95 @@ public class SitesPanel {
     }
 
     public static View build(Activity act, BrowserView browser, Runnable onClose) {
-        List<Site> sites = loadSites(act);
         LinearLayout box = new LinearLayout(act);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(40, 30, 40, 30);
+        box.setPadding(36, 26, 36, 26);
         box.setBackgroundColor(0xF2101010);
 
-        TextView title = new TextView(act);
-        title.setText("影视站点 — 进入后点【⚡轻站】或按菜单键，一键转 TV 界面");
-        title.setTextColor(0xFF4FC3F7); title.setTextSize(16);
-        title.setPadding(0, 0, 0, 24);
-        box.addView(title);
+        /* ---------- 推荐影视（6.0 新增，放最上面，遥控器一进来就能选） ---------- */
+        box.addView(sectionTitle(act, "🎬 推荐影视　上下键选，OK 进入", 0xFF4FC3F7));
 
+        TextView hint = new TextView(act);
+        hint.setText("标「可直接播」的点进去就是海报墙，遥控器一路 OK 到底；\n没标的会用浏览器打开原站。");
+        hint.setTextColor(0xFF80809A);
+        hint.setTextSize(12);
+        hint.setPadding(0, 0, 0, 10);
+        box.addView(hint);
+
+        for (final SourceBook.WebSite s : SourceBook.webSites()) {
+            Button b = new Button(act);
+            b.setText(s.nativePlay() ? ("▶ " + s.name + "　" + s.desc) : ("🌐 " + s.name + "　" + s.desc));
+            b.setTextSize(16);
+            b.setPadding(22, 12, 22, 12);
+            b.setFocusable(true);
+            b.setFocusableInTouchMode(true);
+            b.setTextColor(s.nativePlay() ? 0xFFFFD180 : Color.WHITE);
+            b.setBackgroundColor(0xFF222230);
+            b.setOnFocusChangeListener((v, hasF) -> {
+                b.setTextColor(hasF ? 0xFFFFB74D : (s.nativePlay() ? 0xFFFFD180 : Color.WHITE));
+                b.setBackgroundColor(hasF ? 0x554FC3F7 : 0xFF222230);
+            });
+            b.setOnClickListener(v -> {
+                if (s.nativePlay()) {
+                    // 有苹果CMS接口的直接走原生海报墙，比在电视上跑网页省太多
+                    VodActivity.launch(act, s.api, s.name);
+                } else {
+                    browser.getWebView().loadUrl(s.url);
+                }
+                onClose.run();
+            });
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            blp.bottomMargin = 6;
+            box.addView(b, blp);
+        }
+
+        /* ---------- 我自己配的站点 ---------- */
+        box.addView(sectionTitle(act, "📁 我的站点", 0xFF9A9AB4));
+        List<Site> sites = loadSites(act);
         for (Site s : sites) {
             Button b = new Button(act);
             b.setText(s.name + "   " + s.desc);
-            b.setTextSize(16);
-            b.setPadding(24, 14, 24, 14);
+            b.setTextSize(15);
+            b.setPadding(22, 10, 22, 10);
             b.setFocusable(true);
             b.setFocusableInTouchMode(true);
+            b.setTextColor(Color.WHITE);
+            b.setBackgroundColor(0xFF222230);
             b.setOnFocusChangeListener((v, hasF) -> {
                 b.setTextColor(hasF ? 0xFFFFB74D : Color.WHITE);
-                b.setBackgroundColor(hasF ? 0x444FC3F7 : 0xFF222230);
+                b.setBackgroundColor(hasF ? 0x554FC3F7 : 0xFF222230);
             });
             b.setOnClickListener(v -> { browser.getWebView().loadUrl(s.url); onClose.run(); });
-            box.addView(b);
+            LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            blp.bottomMargin = 4;
+            box.addView(b, blp);
+        }
+
+        /* ---------- 遥控器指引（轻量，常驻在底部） ---------- */
+        box.addView(sectionTitle(act, "🎮 遥控器怎么用", 0xFF9A9AB4));
+        for (String line : SourceBook.GUIDE_BROWSER) {
+            TextView t = new TextView(act);
+            t.setText("· " + line);
+            t.setTextColor(0xFF7A7A90);
+            t.setTextSize(12);
+            t.setLineSpacing(6, 1f);
+            t.setPadding(0, 3, 0, 3);
+            box.addView(t);
         }
 
         ScrollView sc = new ScrollView(act);
         sc.addView(box);
         return sc;
+    }
+
+    private static TextView sectionTitle(Activity act, String text, int color) {
+        TextView t = new TextView(act);
+        t.setText(text);
+        t.setTextColor(color);
+        t.setTextSize(14);
+        t.setPadding(0, 16, 0, 8);
+        return t;
     }
 }

@@ -135,9 +135,9 @@ public class MainActivity extends Activity {
                 if (sitesHost != null) sitesHost.setVisibility(View.GONE);
                 browser.getWebView().loadUrl(pushUrl);
                 showOsd("收到推送: " + pushUrl);
-            } else if (!showSites) {
-                if (sitesHost != null) sitesHost.setVisibility(View.GONE);
             }
+            // 6.0：没带推送地址时保留左侧面板 —— 它就是「推荐影视」页，
+            // 以前这里会把面板藏掉、留一片黑，等于网页入口是空的。
         } else {
             handler.postDelayed(() -> showOsd("按菜单键(INFO)频道列表 · 按搜索键进入浏览器点播 · OK键设置 · 返回键回主页"), 4000);
         }
