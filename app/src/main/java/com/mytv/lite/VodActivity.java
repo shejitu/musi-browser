@@ -49,6 +49,18 @@ public class VodActivity extends Activity {
         ctx.startActivity(it);
     }
 
+    /**
+     * 慕思 5.0：带着片名进来，直接出搜索结果。
+     * 用于首页海报墙点「在影视源里搜这部片」——豆瓣给片名，影视源给片源。
+     */
+    public static void launchSearch(Context ctx, String apiUrl, String siteName, String keyword) {
+        android.content.Intent it = new android.content.Intent(ctx, VodActivity.class);
+        it.putExtra("api", normalizeApi(apiUrl));
+        it.putExtra("site", siteName);
+        it.putExtra("search", keyword);
+        ctx.startActivity(it);
+    }
+
     /** 各类 CMS 接口统一转成 videolist 协议 */
     static String normalizeApi(String api) {
         api = api.trim();
@@ -133,7 +145,45 @@ public class VodActivity extends Activity {
         detailPanel.setLayoutParams(dlp);
         body.addView(detailPanel);
 
-        load(page = 1, currentCategory);
+        // 慕思 5.0：从首页海报墙带片名进来 → 直接搜索；否则按分类首页加载
+        String kw = getIntent().getStringExtra("search");
+        if (kw != null && !kw.trim().isEmpty()) {
+            navRow.setVisibility(android.view.View.GONE);
+            doSearch(kw.trim());
+        } else {
+            load(page = 1, currentCategory);
+        }
+    }
+
+    /** 按片名搜索（遥控器搜索框与首页「搜这部片」共用）。 */
+    private void doSearch(final String wd) {
+        status.setText("正在影视源里搜「" + wd + "」…");
+        new Thread(() -> {
+            try {
+                JSONObject d2 = JSONUtil.parse(ReposHttp.get(
+                        apiBase + (apiBase.contains("?") ? "&" : "?") + "wd=" + URLEncoder.encode(wd, "UTF-8")));
+                JSONArray list = d2 == null ? null : d2.optJSONArray("list");
+                final List<Video> vids = new ArrayList<>();
+                if (list != null) for (int i = 0; i < list.length(); i++) {
+                    JSONObject o = list.getJSONObject(i);
+                    Video v = new Video();
+                    v.id = o.optString("vod_id"); v.name = o.optString("vod_name", "?");
+                    v.pic = o.optString("vod_pic", ""); v.category = o.optString("type_name", "");
+                    v.remarks = o.optString("vod_remarks", "");
+                    vids.add(v);
+                }
+                handler.post(() -> {
+                    if (isFinishing()) return;
+                    videos.clear(); videos.addAll(vids);
+                    status.setText(vids.isEmpty()
+                            ? "这个源里没搜到「" + wd + "」，左右键翻页或换个源试试"
+                            : "搜索「" + wd + "」: " + vids.size() + " 个结果");
+                    buildGrid();
+                });
+            } catch (Exception e) {
+                handler.post(() -> { if (!isFinishing()) status.setText("✗ 搜索失败: " + e.getMessage()); });
+            }
+        }, "vod-search").start();
     }
 
     private void load(final int pg, final int cat) {
@@ -404,26 +454,7 @@ public class VodActivity extends Activity {
             .setPositiveButton("搜索", (d, w) -> {
                 String wd = in.getText().toString().trim();
                 if (wd.isEmpty()) return;
-                new Thread(() -> {
-                    try {
-                        JSONObject d2 = JSONUtil.parse(ReposHttp.get(apiBase + (apiBase.contains("?") ? "&" : "?") + "wd=" + URLEncoder.encode(wd, "UTF-8")));
-                        JSONArray list = d2 == null ? null : d2.optJSONArray("list");
-                        final List<Video> vids = new ArrayList<>();
-                        if (list != null) for (int i = 0; i < list.length(); i++) {
-                            JSONObject o = list.getJSONObject(i);
-                            Video v = new Video();
-                            v.id = o.optString("vod_id"); v.name = o.optString("vod_name", "?");
-                            v.pic = o.optString("vod_pic", ""); v.category = o.optString("type_name", "");
-                            v.remarks = o.optString("vod_remarks", "");
-                            vids.add(v);
-                        }
-                        handler.post(() -> {
-                            videos.clear(); videos.addAll(vids);
-                            status.setText("搜索「" + wd + "」: " + vids.size() + " 个结果");
-                            buildGrid();
-                        });
-                    } catch (Exception e) { handler.post(() -> toast("搜索失败: " + e.getMessage())); }
-                }).start();
+                doSearch(wd);
             })
             .setNegativeButton("取消", null).show();
     }

@@ -49,12 +49,18 @@ jobs:
         run: |
           set -e
           mkdir -p out
+          # 版本号从 build.gradle 读，避免每次发版都改 workflow
+          VN=$(grep -oP 'versionName\s+"\K[^"]+' app/build.gradle | head -1)
+          echo "version=$VN"
           SRC=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
           echo "built: $SRC"
-          cp "$SRC" out/MusiBrowser-v4.1.apk
+          test -n "$SRC"
+          cp "$SRC" "out/MusiBrowser-v${VN}.apk"
           ls -la out
           APKSIGNER=$(find "$ANDROID_HOME/build-tools" -name apksigner | sort | tail -1)
-          "$APKSIGNER" verify --print-certs out/MusiBrowser-v4.1.apk || true
+          # 硬闸门：签名不对直接让构建失败，不产出装不上的包
+          "$APKSIGNER" verify --print-certs "out/MusiBrowser-v${VN}.apk"
+          echo "APK_NAME=MusiBrowser-v${VN}.apk" >> "$GITHUB_ENV"
 
       - name: 上传 artifact
         uses: actions/upload-artifact@v4
@@ -72,5 +78,5 @@ jobs:
           git config user.email "actions@github.com"
           git checkout -q -b apk
           git add -A
-          git commit -qm "apk v4.1 (run ${GITHUB_RUN_NUMBER})"
+          git commit -qm "apk ${APK_NAME} (run ${GITHUB_RUN_NUMBER})"
           git push -f -q "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" apk
