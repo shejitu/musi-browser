@@ -217,6 +217,15 @@ public class VodActivity extends Activity {
 
     private void buildGrid() {
         grid.removeAllViews();
+        // v4.2：竖版海报墙。原来是固定 dp(180) 高，5 列时每格又宽又扁，整屏像"横条"；
+        // 现在按网格实际可用宽度算卡片宽，高度 = 宽 / 0.71（约 2:3 竖版）。
+        int gridW = gridScroll.getWidth();
+        if (gridW <= 0) {
+            gridW = getResources().getDisplayMetrics().widthPixels - dp(48);
+        }
+        int cellW = (gridW - dp(12) * 5) / 5;      // 每张卡片左右各 6dp 外边距
+        if (cellW < dp(60)) cellW = dp(60);
+        int posterH = (int) (cellW / 0.71f);
         LinearLayout row = null;
         for (int i = 0; i < videos.size(); i++) {
             if (i % 5 == 0) {
@@ -234,16 +243,18 @@ public class VodActivity extends Activity {
             ImageView img = new ImageView(this);
             img.setBackgroundColor(0xFF222230);
             img.setScaleType(ImageView.ScaleType.CENTER_CROP);
-            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, dp(180));
+            LinearLayout.LayoutParams ilp = new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, posterH);
             img.setLayoutParams(ilp);
             img.setTag("img_" + i);
             card.addView(img);
 
             TextView nm = new TextView(this);
             nm.setText(v.name + (v.remarks.isEmpty() ? "" : " " + v.remarks));
-            nm.setTextColor(Color.WHITE); nm.setTextSize(12);
+            nm.setTextColor(Color.WHITE);
+            nm.setTextSize(12);
             nm.setMaxLines(1);
-            nm.setPadding(dp(4), dp(4), dp(4), dp(8));
+            nm.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            nm.setPadding(dp(4), dp(6), dp(4), dp(8));
             card.addView(nm, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
 
             card.setOnClickListener(vv -> showDetail(v));

@@ -103,7 +103,7 @@ public class HomeActivity extends Activity {
         addCard("🎬", "影视点播", "网页嗅探 · ⚡轻站转TV", 0xFF3D2B1F, new Launcher() {
             @Override public void launch() { MainActivity.launchBrowser(HomeActivity.this); }
         });
-        addCard("📺", "影视频道", "仓库推荐影视 · 海报墙", 0xFF2B1F3D, new Launcher() {
+        addCard("🖼", "海报墙", "竖版海报 · 5 列网格", 0xFF2B1F3D, new Launcher() {
             @Override public void launch() { ChannelActivity.launch(HomeActivity.this); }
         });
         addCard("📁", "本地文件", "Download/download · 播放/安装", 0xFF33301F, new Launcher() {
@@ -132,6 +132,8 @@ public class HomeActivity extends Activity {
         cardRow.post(() -> { if (!cardRow.hasFocus() && cardRow.getChildCount() > 0) cardRow.getChildAt(0).requestFocus(); });
         handler.post(clockTick);
         startServer();
+        // 慕思 4.2：启动时静默检查 GitHub 新版本；无更新 / 断网 / 仓库不可访问时完全静默。
+        try { UpdateChecker.check(this); } catch (Throwable ignore) { }
     }
 
     private void addCard(String icon, String name, String desc, int bgColor, final Launcher l) {
